@@ -1,0 +1,1302 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+<title>TH TurnScore Pro</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
+
+<link rel="manifest" href="data:application/manifest+json;base64,ewogICJuYW1lIjogIk1BRyBTY29yZSBQcm8iLAogICJzaG9ydF9uYW1lIjogIk1BRyBTY29yZSIsCiAgImRpc3BsYXkiOiAicHVsbHNjcmVlbiIsCiAgInN0YXJ0X3VybCI6ICIuIiwKICAiYmFja2dyb3VuZF9jb2xvciI6ICIjZmZmZmZmIiwKICAidGhlbWVfY29sb3IiOiAiIzFhNzNlOCIsCiAgImljb25zIjogW3sKICAgICJzcmMiOiAiaHR0cHM6Ly9jZG4taWNvbnMtcG5nLmZsaXRpY29uLmNvbS81MTIvMjkwNi8yOTA2OTkxLnBuZyIsCiAgICAic2l6ZXMiOiAiNTEyeDUxMiIsCiAgICAidHlwZSI6ICJpbWFnZS9wbmciCiAgfV0KfQ==">
+
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    const swCode = `
+      const CACHE_NAME = 'turnscore-v1.7';
+      self.addEventListener('install', e => {
+        e.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(['./'])));
+      });
+      self.addEventListener('fetch', e => {
+        e.respondWith(caches.match(e.request).then(res => res || fetch(e.request)));
+      });`;
+    const blob = new Blob([swCode], {type: 'text/javascript'});
+    navigator.serviceWorker.register(URL.createObjectURL(blob));
+  });
+}
+</script>
+
+<style>
+/* --- BASIS STIJLEN --- */
+:root {
+--sidebar-width: 135px;
+--topbar-height: 110px;
+}
+#dashboard-logo { position: absolute; top: 20px; left: 20px; height: 80px; width: auto; object-fit: contain; }
+@media (max-width: 600px) { #dashboard h1 { margin-top: 50px; } }
+#dashboard { padding: 20px; max-width: 1100px; margin: 0 auto; display: block; font-family: 'Segoe UI', sans-serif; position: relative; min-height: 100vh; overflow-y: auto; }
+.btn-settings-icon { position: absolute; top: 20px; right: 20px; background: #eee; border: 1px solid #ccc; border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 20px; transition: background 0.2s; z-index: 100; }
+.btn-settings-icon:hover { background: #ddd; }
+.card { background: #f9f9f9; padding: 20px; border-radius: 10px; border: 1px solid #ddd; margin-bottom: 20px; }
+#wedstrijd-lijst { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; margin-top: 10px; }
+.wedstrijd-item { display: flex; flex-direction: column; justify-content: space-between; padding: 12px; border: 1px solid #eee; background: #fff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); transition: transform 0.2s; }
+.wedstrijd-item:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+.wedstrijd-info { cursor: pointer; margin-bottom: 10px; flex-grow: 1; }
+.wedstrijd-info strong { font-size: 14px; color: #2c3e50; display: block; margin-bottom: 2px; white-space: normal; word-wrap: break-word; }
+.wedstrijd-info small { color: #7f8c8d; font-size: 11px; }
+.export-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.btn-action { padding: 6px 2px; border-radius: 4px; border: 1px solid #ccc; cursor: pointer; font-size: 9px; font-weight: bold; text-align: center; }
+.btn-pdf { background: #e74c3c; color: white; border: none; }
+.btn-edit { background: #3498db; color: white; border: none; }
+.btn-del { background: #95a5a6; color: white; border: none; }
+.btn-excel { background: #27ae60; color: white; border: none; }
+.btn-main { background: #000; color: #fff; border: none; padding: 15px; width: 100%; border-radius: 8px; font-size: 18px; font-weight: bold; cursor: pointer; margin-bottom: 10px; }
+body { font-family: 'Segoe UI', sans-serif; margin: 0; padding: 0; background: #ffffff; color: #000; overflow-x: hidden; touch-action: none; }
+
+/* INTERFACE LAYOUT */
+#app-interface { display: none; width: 100%; height: 100vh; overflow: hidden; position: fixed; top: 0; left: 0; }
+.main-content { flex-grow: 1; display: flex; flex-direction: column; position: relative; height: 100%; overflow: hidden; }
+
+.top-bar { 
+display: flex; 
+gap: 15px; 
+padding: 0 15px; 
+background: #ffffff; 
+border-bottom: 1px solid #000; 
+align-items: center; 
+height: var(--topbar-height); 
+box-sizing: border-box; 
+flex-shrink: 0; 
+position: relative; 
+z-index: 100;       
+overflow: visible;  
+}
+.sidebar { width: var(--sidebar-width); background: white; padding: 5px; border-left: 1px solid #3498db; height: 100vh; box-sizing: border-box; overflow-y: auto; flex-shrink: 0; }
+
+.input-group { display: flex; align-items: center; gap: 5px; font-size: 14px; }
+.input-group label { font-weight: bold; text-transform: uppercase; font-size: 11px; width: 12px; }
+.input-standard, select { width: 48px; height: 28px; padding: 2px; font-size: 14px; border: 1px solid #ccc; border-radius: 2px; text-align: center; box-sizing: border-box; font-family: inherit; }
+#new-comp-type.input-standard { width: 100%; height: 30px; margin: 10px 0; font-size: 16px; }
+.final-menu-stack { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-left: auto; }
+.menu-btn { background: #fff; color: #000; border: 1px solid #000; cursor: pointer; font-weight: bold; font-size: 9px; border-radius: 2px; width: 48px; height: 28px; display: flex; align-items: center; justify-content: center; padding: 0; }
+.score-modifiers-column { display: flex; flex-direction: column; gap: 5px; }
+
+/* CANVAS STIJLEN */
+#nameCanvas { border: 1px solid #ccc; background: #fdfdfd; border-radius: 4px; touch-action: none; cursor: crosshair; }
+#writeCanvas { flex-grow: 1; width: 100%; height: 100%; background: white; cursor: crosshair; touch-action: none; display: block; }
+
+/* E-PANEL SECTIE */
+.e-panel-section { display: flex; align-items: center; gap: 5px; background: #f4f4f4; padding: 10px; border-radius: 4px; }
+.jury-label-stack { display: flex; flex-direction: column; align-items: center; gap: 0px; min-width: 50px; }
+.vt-label-text { font-size: 12px; font-weight: bold; color: #1565c0; }
+#e-fields-container { display: flex; flex-direction: column; gap: 5px; }
+.e-score-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+.vt-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; align-items: center; background: rgba(0,0,0,0.03); padding: 10px; border-radius: 4px; }
+.standard-e-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; }
+.avg-e-box { border-left: 1px solid #ccc; padding-left: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+#avgE, #avgE2 { font-size: 14px; font-weight: bold; color: #2c3e50; }
+.final-score-display { font-weight: bold; text-align: center; }
+.final-score-display span { font-size: 18px; display: block; line-height: 1.1; }
+
+.canvas-nav { position: absolute; top: calc(var(--topbar-height) + 5px); right: 5px; display: flex; align-items: center; gap: 3px; background: rgba(255,255,255,0.5); padding: 2px; border-radius: 4px; z-index: 100; }
+.nav-btn { background: #fff; border: 1px solid #ccc; width: 18px; height: 18px; cursor: pointer; font-weight: bold; font-size: 12px; display: flex; align-items: center; justify-content: center; border-radius: 2px; }
+h3 { font-size: 11px; margin: 2px 0; text-align: center; border-bottom: 1px solid #eee; }
+#counter-msg { font-size: 10px; font-weight: bold; padding: 3px; border-radius: 3px; text-align: center; margin-bottom: 5px; }
+.valid { background: #e8f5e9; color: #2e7d32; }
+.invalid { background: #ffebee; color: #c62828; }
+.element-row { display: grid; grid-template-columns: 48px 24px 1fr; gap: 2px; align-items: center; margin-bottom: 1px; }
+.letter-label { font-size: 11px; font-weight: bold; text-align: center; }
+.line-sum { font-size: 10px; color: #7f8c8d; text-align: right; }
+.sum-section { background: #eef2f7; padding: 3px 5px; font-size: 11px; margin: 3px 0; border-radius: 3px; font-weight: bold; }
+.sum-line { display: flex; justify-content: space-between; }
+.groups-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; margin-top: 5px; }
+.group-box { background: #f9f9f9; padding: 2px; border: 1px solid #ddd; border-radius: 3px; text-align: center; }
+.group-box label { display: block; font-size: 9px; font-weight: bold; }
+.final-box { margin-top: 8px; padding: 6px; background: #2c3e50; color: white; border-radius: 5px; text-align: center; }
+.final-box span { font-size: 16px; font-weight: bold; color: #3498db; }
+.bonus-container { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-top: 5px; border-top: 1px solid #eee; padding-top: 5px; }
+.bonus-box { font-size: 9px; display: flex; flex-direction: column; align-items: center; }
+#settings-panel { display: none; }
+.setting-row { margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.setting-row label { font-size: 13px; font-weight: bold; flex: 1; }
+.setting-row input, .setting-row select { width: 80px; padding: 5px; height: 30px; }
+.checkbox-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 10px; background: #eee; border-radius: 5px; margin-bottom: 10px; }
+.checkbox-item { display: flex; align-items: center; gap: 5px; font-size: 12px; }
+.checkbox-item input { width: 18px; height: 18px; }
+.btn-reset { background: #f39c12; color: white; border: none; padding: 8px; width: 100%; border-radius: 4px; font-weight: bold; cursor: pointer; margin-top: 5px; }
+#modal-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:2000; justify-content:center; align-items:center; }
+.modal-content { background:white; padding:25px; border-radius:10px; width:300px; text-align:center; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+.modal-content input { width:100%; padding:10px; margin:10px 0; border:1px solid #ccc; border-radius:4px; box-sizing: border-box; font-family: inherit; }
+.blanco-select { width: 35px; height: 28px; font-size: 11px; padding: 0; text-align: center; border: 1px solid #ccc; border-radius: 2px; font-family: inherit; background: #fff; }
+
+/* TOOLBAR */
+.floating-toolbar { position: absolute; top: calc(var(--topbar-height) + 5px); left: 10px; background: #ffffff; padding: 5px 8px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.15); border: 1px solid #ccc; display: flex; gap: 6px; align-items: center; z-index: 999; }
+.tool-btn { background: #ffffff; border: 1px solid #f0f0f0; cursor: pointer; width: 28px; height: 28px; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: all 0.2s ease; position: relative; }
+.tool-btn.active { background: #e3f2fd; border-color: #42a5f5; }
+.icon-svg { width: 16px; height: 16px; fill: none; stroke: #333; stroke-width: 1.8px; stroke-linecap: round; stroke-linejoin: round; }
+.tool-btn.active .icon-svg { stroke: #1565c0; stroke-width: 2.2px; }
+.no-entry-overlay { position: absolute; width: 22px; height: 22px; border: 2px solid #ff4d4d; border-radius: 50%; display: none; pointer-events: none; z-index: 5; }
+.no-entry-overlay::after { content: ''; position: absolute; top: 50%; left: 0; width: 100%; height: 2px; background: #ff4d4d; transform: rotate(-45deg); }
+.palm-locked .no-entry-overlay { display: block; }
+.color-picker-container { display: flex; gap: 4px; }
+.color-circle { width: 16px; height: 16px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; transition: 0.2s; }
+.color-circle.active { border-color: #1a73e8; transform: scale(1.1); }
+.separator { width: 1px; height: 18px; background: #ddd; }
+.slider-box { display: flex; align-items: center; gap: 3px; }
+input[type="range"] { cursor: pointer; accent-color: #1a73e8; width: 50px; height: 4px; }
+.size-badge { background: #1a73e8; color: white; width: 18px; height: 18px; border-radius: 4px; font-size: 8px; font-weight: bold; display: flex; align-items: center; justify-content: center; }
+
+/* Stijl voor de notitie in instellingen */
+.settings-note { background: #fff3cd; color: #856404; padding: 10px; border-radius: 5px; font-size: 12px; margin-bottom: 15px; border: 1px solid #ffeeba; text-align: left; font-weight: bold; }
+
+/* VT Specifiek */
+.vt-hidden { display: none !important; }
+.vt-visible { display: block !important; }
+#vt-sidebar-content, #mb-sidebar-content { padding-top: 10px; }
+.vt-sidebar-box { margin-bottom: 15px; background: #f0f8ff; padding: 5px; border-radius: 4px; border: 1px solid #bcd; }
+.vt-sidebar-box h4 { margin: 0 0 5px 0; font-size: 10px; text-align: center; color: #1565c0; text-transform: uppercase; border-bottom: 1px solid #bcd; padding-bottom: 2px; }
+.vt-input-col { display:flex; flex-direction:column; gap:4px; }
+.vt-label { font-size:9px; font-weight:bold; color:#555; text-align:center; display:block; }
+
+.e-panel-section.sticky-e-panel { position: absolute; top: 0; z-index: 1000; background: #f4f4f4; border-top: none; border-radius: 0 0 4px 4px; padding: 10px; box-sizing: border-box; }
+.top-bar { position: relative; display: flex; align-items: center; overflow: visible !important; }
+
+/* MIDDENBOUW SPECIFIEK */
+.mb-traj-box { 
+    margin-bottom: 5px; 
+    display: flex; 
+    flex-direction: column; /* Label boven dropdown */
+    justify-content: center; 
+    align-items: center; 
+    padding: 2px; 
+}
+.mb-traj-select { 
+    width: 90%; 
+    height: 25px; 
+    font-weight: bold; 
+    text-align: center;
+}
+</style>
+</head>
+<body>
+<div id="modal-overlay">
+<div class="modal-content">
+<h3 style="font-size:16px; border:none; margin-bottom:10px;">Nieuwe Wedstrijd</h3>
+<input type="text" id="new-comp-name" placeholder="Naam wedstrijd">
+<select id="new-comp-type" class="input-standard">
+<option value="FIG">FIG </option>
+<option value="NTS 1 & 2">NTS 1 & 2</option>
+<option value="NTS 3">NTS 3</option>
+<option value="NTS 4">NTS 4 </option>
+<option value="NTS 5">NTS 5 </option>
+<option value="NTS 6">NTS 6 </option>
+<option value="Middenbouw">Middenbouw</option>
+</select>
+<button class="btn-main" onclick="bevestigNieuweWedstrijd()">Starten</button>
+<button class="btn-reset" onclick="sluitModal()" style="background:#95a5a6;">Annuleren</button>
+</div>
+</div>
+<div id="dashboard">
+<img src="thlogo.jpg" id="dashboard-logo" alt="Logo">
+<div class="btn-settings-icon" onclick="toggleSettings()" title="Layout Instellingen">⚙</div>
+<h1 style="text-align:center">TH TurnScore Pro</h1>
+<div class="card">
+<button class="btn-main" id="btn-new-competition" onclick="openModal()">+ Nieuwe Wedstrijd Starten</button>
+</div>
+<div id="settings-panel" class="card">
+<div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 1px solid #eee; margin-bottom:10px;">
+<h3 style="border:none; margin:0;" id="settings-title">Instellingen</h3>
+<button onclick="toggleSettings()" style="background:none; border:none; cursor:pointer; font-weight:bold;">X</button>
+</div>
+<div class="settings-note">
+De instellingen worden toegepast bij nieuwe wedstrijden en niet op bestaande wedstrijden.
+</div>
+<div class="setting-row">
+<label id="lbl-lang">Taal / Language:</label>
+<select id="set-lang" onchange="changeLanguage()" style="width: 100px;">
+<option value="nl">Nederlands</option>
+<option value="en">English</option>
+</select>
+</div>
+<label id="visible_el" data-i18n="visible_el" style="font-size: 13px; font-weight: bold; margin-bottom: 5px; display: block;">Zichtbare Elementen (E-J):</label>
+<div class="checkbox-grid" id="visible-elements-settings">
+<div class="checkbox-item"><input type="checkbox" id="show-E" checked onchange="updateBlancoOptions(); saveVisibilitySettings()"> <label>E</label></div>
+<div class="checkbox-item"><input type="checkbox" id="show-F" checked onchange="updateBlancoOptions(); saveVisibilitySettings()"> <label>F</label></div>
+<div class="checkbox-item"><input type="checkbox" id="show-G" checked onchange="updateBlancoOptions(); saveVisibilitySettings()"> <label>G</label></div>
+<div class="checkbox-item"><input type="checkbox" id="show-H" checked onchange="updateBlancoOptions(); saveVisibilitySettings()"> <label>H</label></div>
+<div class="checkbox-item"><input type="checkbox" id="show-I" checked onchange="updateBlancoOptions(); saveVisibilitySettings()"> <label>I</label></div>
+<div class="checkbox-item"><input type="checkbox" id="show-J" checked onchange="updateBlancoOptions(); saveVisibilitySettings()"> <label>J</label></div>
+</div>
+<div class="setting-row">
+    <label id="lbl-blanco">Extra Blanco Velden:</label>
+    <select id="set-blanco-count" onchange="saveVisibilitySettings()" style="width: 100px;">
+        <option value="0">0</option>
+        <option value="1">1</option>
+        <option value="2">2</option>
+        <option value="3">3</option>
+        <option value="4">4</option>
+        <option value="5">5</option>
+        <option value="6">6</option>
+    </select>
+</div>
+<div class="setting-row">
+    <label id="lbl-gym-w">Breedte Gymnast (px):</label>
+    <input type="number" id="set-canvas-w" value="200" onchange="saveVisibilitySettings()">
+</div>
+<div class="setting-row">
+    <label id="lbl-gym-h">Hoogte Gymnast (px):</label>
+    <input type="number" id="set-canvas-h" value="75" onchange="saveVisibilitySettings()">
+</div>
+<div class="setting-row">
+<label id="lbl-sidebar-w">Breedte Sidebar (px):</label>
+<input type="number" id="set-sidebar-w" value="135" onchange="updateLayoutSettings()">
+</div>
+<div class="setting-row">
+<label id="lbl-topbar-h">Hoogte Topbar (px):</label>
+<input type="number" id="set-topbar-h" value="115" onchange="updateLayoutSettings()">
+</div>
+<button class="btn-reset" id="btn-reset-settings" onclick="resetSettings()">Reset naar Standaard</button>
+</div>
+<div class="card">
+<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+<h3 id="my-competitions-title" style="margin:0; font-size:16px; border:none;">Mijn Wedstrijden</h3>
+<select id="sort-order" onchange="laadOverzicht()" style="width: 120px; height: 24px; font-size: 11px;">
+<option value="new">Datum (Nieuw)</option>
+<option value="old">Datum (Oud)</option>
+<option value="name">Naam (A-Z)</option>
+</select>
+</div>
+<div id="wedstrijd-lijst"></div>
+</div>
+</div>
+<div id="app-interface">
+<div class="main-content">
+<div class="floating-toolbar">
+    <button id="penBtn" class="tool-btn active" onclick="setMode('pen')">
+        <svg class="icon-svg" viewBox="0 0 24 24"><path d="M18.5 2.5L21.5 5.5L8 19L3 21L5 16L18.5 2.5Z"></path><path d="M7 14L10 17"></path></svg>
+    </button>
+    <button id="eraserBtn" class="tool-btn" onclick="setMode('eraser')">
+        <svg class="icon-svg" viewBox="0 0 24 24" style="transform: rotate(45deg);"><rect x="7" y="3" width="10" height="11" rx="1"></rect><path d="M7 14C7 16.76 9.24 19 12 19C14.76 19 17 16.76 17 14"></path></svg>
+    </button>
+    <div class="separator"></div>
+    <button id="palmBtn" class="tool-btn palm-locked" onclick="togglePalmRejection()">
+        <div class="no-entry-overlay"></div>
+        <svg class="icon-svg" viewBox="0 0 24 24"><path d="M10 22C10 22 5 21 4 16L3 13C2.5 12 3.5 11 4.5 12L7 14V5C7 4 8 3 9 3C10 3 11 4 11 5V12"></path></svg>
+    </button>
+    <div class="separator"></div>
+    <div class="color-picker-container">
+        <div class="color-circle active" style="background: #1C333E;" onclick="selectColor('#1C333E', this)"></div>
+        <div class="color-circle" style="background: #99CFC5;" onclick="selectColor('#99CFC5', this)"></div>
+        <div class="color-circle" style="background: #E88371;" onclick="selectColor('#E88371', this)"></div>
+    </div>
+    <div class="separator"></div>
+    <div class="slider-box">
+        <input type="range" id="size" min="1" max="100" step="1" value="11" oninput="updateSizeDisplay(this.value)">
+        <div class="size-badge" id="sizeValue">11</div>
+    </div>
+</div>
+
+<div class="top-bar">
+<div class="name-canvas-container" style="display:flex; flex-direction:column; align-items:center;">
+<label style="font-size: 11px; font-weight: bold;" data-i18n="gymnast">Gymnast</label>
+<canvas id="nameCanvas" width="200" height="75"></canvas>
+</div>
+<div class="apparatus-container" style="display:flex; flex-direction:column; align-items:center; margin: 0 10px;">
+    <label style="font-size: 11px; font-weight: bold; text-transform: uppercase; margin-bottom: 4px;">Toestel</label>
+    <select id="apparatus-select" class="input-standard" style="width: 60px; background: white;" onchange="updateApparatusImage(); rekenen();">
+        <option value="FX">FX</option>
+        <option value="PH">PH</option>
+        <option value="SR">SR</option>
+        <option value="VT">VT</option>
+        <option value="PB">PB</option>
+        <option value="HB">HB</option>
+    </select>
+    <img id="apparatus-display-img" src="" style="display:none; width: 40px; height: 40px; margin-top: 5px; object-fit: contain;">
+</div>
+<div class="e-panel-section">
+<div class="jury-label-stack">
+    <div style="text-align: center;">
+        <label style="font-size: 9px; display: block;">JURY</label>
+        <select id="juryCount" class="input-standard" style="width:45px;" onchange="buildEInputs()">
+            <option value="1">1</option>
+            <option value="2" selected>2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+            <option value="6">6</option>
+            <option value="7">7</option>
+        </select>
+    </div>
+</div>
+
+    <div id="e-fields-container"></div>
+
+    <div class="avg-e-box">
+        <label style="font-size:9px;">AVG E</label>
+        <div id="avgE" style="font-weight:bold; font-size:14px;">0.000</div>
+        <div id="avgE2" class="vt-hidden" style="color:#777; font-size:11px;">0.000</div>
+    </div>
+</div>
+
+<div class="score-modifiers-column">
+    <div style="display:flex; gap:4px;">
+        <div class="input-group" id="b-score-container" style="display:none;">
+            <label>B</label>
+            <input type="text" id="b_score" value="0.0" inputmode="decimal" onfocus="this.select()" oninput="fixComma(this); rekenen();" class="input-standard">
+        </div>
+        <div class="input-group">
+            <label data-i18n="neutral">N</label>
+            <input type="text" id="neutraal" value="0.0" inputmode="decimal" onfocus="this.select()" oninput="fixComma(this); rekenen();" class="input-standard">
+        </div>
+    </div>
+    <div id="vt-modifiers-top" class="vt-hidden" style="display:flex; gap:4px;">
+        <div class="input-group" id="b-score-container2" style="display:none;">
+            <label style="color:#555;">B2</label>
+            <input type="text" id="vt-b-score2" value="0.0" inputmode="decimal" onfocus="this.select()" oninput="fixComma(this); rekenen();" class="input-standard">
+        </div>
+        <div class="input-group">
+            <label style="color:#555;">N2</label>
+            <input type="text" id="vt-neutraal2" value="0.0" inputmode="decimal" onfocus="this.select()" oninput="fixComma(this); rekenen();" class="input-standard">
+        </div>
+    </div>
+</div>
+
+<div class="final-menu-stack">
+<div class="final-score-display">
+<label style="font-size: 10px; display: block; text-transform: uppercase; color: #666;" data-i18n="final">Final</label>
+<span id="eindCijfer">10.000</span>
+</div>
+<button class="menu-btn" onclick="toonDashboard()">MENU</button>
+</div>
+</div>
+<canvas id="writeCanvas"></canvas>
+<div class="canvas-nav">
+<button class="nav-btn" onclick="goPrevious()" id="btnPrev"> &lsaquo; </button>
+<span id="page-info" style="font-size:9px; min-width:25px; text-align:center;">1/1</span>
+<button class="nav-btn" onclick="goNext()" id="btnNext"> &rsaquo; </button>
+</div>
+</div>
+
+<div class="sidebar">
+<h3>D-SCORE</h3>
+
+<div id="standard-sidebar-content">
+<div id="counter-msg" class="valid">0 / 8</div>
+<div id="el-list"></div>
+<div class="sum-section"><div class="sum-line"><span data-i18n="elements">Σ Elements</span> <span id="sub-elem">0.0</span></div></div>
+<div class="groups-grid">
+<div class="group-box"><label>I</label><select id="grI" onchange="rekenen()"><option value="0.0">0.0</option><option value="0.5">0.5</option></select></div>
+<div class="group-box"><label>II</label><select class="cr" onchange="rekenen()"><option value="0.0">0.0</option><option value="0.3">0.3</option><option value="0.5">0.5</option></select></div>
+<div class="group-box"><label>III</label><select class="cr" onchange="rekenen()"><option value="0.0">0.0</option><option value="0.3">0.3</option><option value="0.5">0.5</option></select></div>
+<div class="group-box"><label>IV</label><select id="grIV" onchange="rekenen()"><option value="0.0">0.0</option><option value="0.1">0.1</option><option value="0.2">0.2</option><option value="0.3">0.3</option><option value="0.4">0.4</option><option value="0.5">0.5</option></select></div>
+</div>
+<div class="sum-section" style="background:#fff3e0;"><div class="sum-line"><span data-i18n="groups">Σ Groepen</span> <span id="sub-groups">0.0</span></div></div>
+<div class="bonus-container">
+<div class="bonus-box"><label>CV</label><input type="text" id="cv" value="0" inputmode="decimal" onfocus="this.select()" oninput="fixComma(this); rekenen();" class="input-standard"></div>
+<div class="bonus-box"><label data-i18n="stick">Stick</label><select id="stickBonus" onchange="rekenen()"><option value="0">0</option><option value="0.1">0.1</option></select></div>
+</div>
+<div class="final-box"><label style="font-size: 9px; text-transform: uppercase; display: block;">D-score</label><span id="totaal">0.000</span></div>
+</div>
+
+<div id="mb-sidebar-content" class="vt-hidden">
+    <div id="mb-trajecten-list">
+        <div class="group-box mb-traj-box" id="mb-traj-1-box">
+           <label> TRAJECT I</label>
+           <select id="mb-traj-1" class="mb-traj-select" onchange="rekenen()">
+               <option value="0.0">0.0</option>
+           </select>
+        </div>
+        <div class="group-box mb-traj-box" id="mb-traj-2-box">
+           <label>TRAJECT II</label>
+           <select id="mb-traj-2" class="mb-traj-select" onchange="rekenen()">
+               <option value="0.0">0.0</option>
+           </select>
+        </div>
+        <div class="group-box mb-traj-box" id="mb-traj-3-box">
+           <label>TRAJECT III</label>
+           <select id="mb-traj-3" class="mb-traj-select" onchange="rekenen()">
+               <option value="0.0">0.0</option>
+           </select>
+        </div>
+        <div class="group-box mb-traj-box" id="mb-traj-4-box">
+           <label>TRAJECT IV</label>
+           <select id="mb-traj-4" class="mb-traj-select" onchange="rekenen()">
+               <option value="0.0">0.0</option>
+           </select>
+        </div>
+        <div class="group-box mb-traj-box" id="mb-traj-5-box">
+           <label>TRAJECT V</label>
+           <select id="mb-traj-5" class="mb-traj-select" onchange="rekenen()">
+               <option value="0.0">0.0</option>
+           </select>
+        </div>
+    </div>
+    
+    <div class="group-box mb-traj-box" id="mb-stick-box" style="margin-top: 10px; background-color: #e0f7fa;">
+       <label>Stick</label>
+       <select id="mb-stick" class="mb-traj-select" onchange="rekenen()">
+           <option value="0">0.0</option>
+           <option value="0.1">0.1</option>
+       </select>
+    </div>
+
+    <div class="final-box"><label style="font-size: 9px; text-transform: uppercase; display: block;">D-score</label><span id="mb-totaal">0.000</span></div>
+</div>
+
+<div id="vt-sidebar-content" class="vt-hidden">
+    <div class="vt-sidebar-box">
+        <h4>Sprong 1</h4>
+        <div style="display:flex; justify-content:center; align-items:center; gap:5px; margin-bottom:5px;">
+            <label style="font-size:11px; font-weight:bold; width:55px; text-align:right;">Nr:</label>
+            <input type="text" id="vt-nummer1" class="input-standard" style="width:60px; font-weight:bold;" value="0" inputmode="numeric" onfocus="this.select()" oninput="this.value = this.value.replace(/[^0-9]/g, '');">
+        </div>
+        <div style="display:flex; justify-content:center; align-items:center; gap:5px; margin-bottom:5px;">
+            <label style="font-size:11px; font-weight:bold; width:55px; text-align:right;">D-Score:</label>
+            <input type="text" id="vt-d1" class="input-standard" style="width:60px; font-weight:bold;" value="0.0" inputmode="decimal" onfocus="this.select()" oninput="fixComma(this); rekenen();">
+        </div>
+        <div class="vt-input-col">
+            <label class="vt-label">Stick</label>
+            <select id="vt-stick1" onchange="rekenen()" class="input-standard" style="width:100%;"><option value="0">0</option><option value="0.1">0.1</option></select>
+        </div>
+    </div>
+    
+    <div class="vt-sidebar-box">
+        <h4>Sprong 2</h4>
+        <div style="display:flex; justify-content:center; align-items:center; gap:5px; margin-bottom:5px;">
+            <label style="font-size:11px; font-weight:bold; width:55px; text-align:right;">Nr:</label>
+            <input type="text" id="vt-nummer2" class="input-standard" style="width:60px; font-weight:bold;" value="0" inputmode="numeric" onfocus="this.select()" oninput="this.value = this.value.replace(/[^0-9]/g, '');">
+        </div>
+        <div style="display:flex; justify-content:center; align-items:center; gap:5px; margin-bottom:5px;">
+            <label style="font-size:11px; font-weight:bold; width:55px; text-align:right;">D-Score:</label>
+            <input type="text" id="vt-d2" class="input-standard" style="width:60px; font-weight:bold;" value="0.0" inputmode="decimal" onfocus="this.select()" oninput="fixComma(this); rekenen();">
+        </div>
+        <div class="vt-input-col">
+            <label class="vt-label">Stick</label>
+            <select id="vt-stick2" onchange="rekenen()" class="input-standard" style="width:100%;"><option value="0">0</option><option value="0.1">0.1</option></select>
+        </div>
+    </div>
+</div>
+
+<script>
+let huidigeWedstrijdId = null;
+let database = [];
+let currentIndex = 0;
+const letters = ['J','I','H','G','F','E','D','C','B','A','TB','TA'];
+const values = {J:1.0, I:0.9, H:0.8, G:0.7, F:0.6, E:0.5, D:0.4, C:0.3, B:0.2, A:0.1, TB:0.2, TA:0.1};
+
+async function exportWedstrijdPDF(id, naam) {
+    const backupId = huidigeWedstrijdId;
+    const backupIndex = currentIndex;
+    const data = JSON.parse(localStorage.getItem(id) || '[]');
+    if (data.length === 0) { alert("Geen gegevens om te exporteren."); return; }
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: 'l', unit: 'mm', format: 'a4' });
+    const target = document.getElementById('app-interface');
+    const dashboard = document.getElementById('dashboard');
+    const sidebar = document.querySelector('.sidebar');
+    const toolbar = document.querySelector('.floating-toolbar');
+    const dashboardWasOpen = dashboard.style.display !== 'none';
+    if(toolbar) toolbar.style.display = 'none';
+    dashboard.style.display = 'none';
+    target.style.display = 'flex';
+    target.style.height = '100vh'; 
+    sidebar.style.height = '100vh';
+    for (let i = 0; i < data.length; i++) {
+        if (i > 0) doc.addPage();
+        huidigeWedstrijdId = id;
+        database = data;
+        currentIndex = i;
+        loadState(i);
+        await new Promise(r => setTimeout(r, 400));
+        const canvas = await html2canvas(target, { scale: 2, useCORS: true, logging: false, windowWidth: target.offsetWidth, windowHeight: target.offsetHeight });
+        const imgData = canvas.toDataURL('image/png');
+        const pdfWidth = doc.internal.pageSize.getWidth();
+        const ratio = pdfWidth / canvas.width;
+        const imgHeight = Math.min(canvas.height * ratio, doc.internal.pageSize.getHeight());
+        doc.addImage(imgData, 'PNG', 0, 0, pdfWidth, imgHeight);
+    }
+    doc.save(`${naam}_Rapport.pdf`);
+    if(toolbar) toolbar.style.display = 'flex';
+    if (dashboardWasOpen) { dashboard.style.display = 'block'; target.style.display = 'none'; }
+    huidigeWedstrijdId = backupId;
+    if (huidigeWedstrijdId) { database = JSON.parse(localStorage.getItem(huidigeWedstrijdId) || '[]'); currentIndex = backupIndex; loadState(currentIndex); }
+}
+
+function saveVisibilitySettings() {
+const visibility = {
+E: document.getElementById('show-E').checked, F: document.getElementById('show-F').checked, G: document.getElementById('show-G').checked, H: document.getElementById('show-H').checked, I: document.getElementById('show-I').checked, J: document.getElementById('show-J').checked,
+blancoCount: parseInt(document.getElementById('set-blanco-count').value) || 0, canvasW: parseInt(document.getElementById('set-canvas-w').value) || 200, canvasH: parseInt(document.getElementById('set-canvas-h').value) || 75
+};
+localStorage.setItem('ts_visibility', JSON.stringify(visibility));
+}
+
+function updateBlancoOptions() {
+const checkboxes = ['show-E', 'show-F', 'show-G', 'show-H', 'show-I', 'show-J'];
+const uitgevinkt = checkboxes.filter(id => !document.getElementById(id).checked).length;
+const select = document.getElementById('set-blanco-count');
+if (parseInt(select.value) > uitgevinkt) select.value = uitgevinkt;
+Array.from(select.options).forEach(opt => opt.disabled = parseInt(opt.value) > uitgevinkt);
+}
+
+function laadVisibilitySettings() {
+const saved = JSON.parse(localStorage.getItem('ts_visibility') || '{"E":true,"F":true,"G":true,"H":true,"I":true,"J":true,"blancoCount":0,"canvasW":200,"canvasH":75}');
+for (const key in saved) { const el = document.getElementById('show-' + key); if (el) el.checked = saved[key]; }
+document.getElementById('set-blanco-count').value = saved.blancoCount || 0;
+document.getElementById('set-canvas-w').value = saved.canvasW || 200;
+document.getElementById('set-canvas-h').value = saved.canvasH || 75;
+updateBlancoOptions();
+}
+
+const translations = {
+    nl: {
+        newComp: "+ Nieuwe Wedstrijd Starten",
+        settingsTitle: "Instellingen",
+        sidebarW: "Breedte Sidebar (px):",
+        topbarH: "Hoogte Topbar (px):",
+        resetBtn: "Reset naar Standaard",
+        myComp: "Mijn Wedstrijden",
+        gymnast: "Gymnast",
+        jury: "Jury",
+        avg_e: "AVG E",
+        neutral: "N",
+        final: "Eindcijfer",
+        elements: "Σ Elementen",
+        groups: "Σ Groepen",
+        stick: "Stick",
+        apparatus_label: "Toestel",
+        dscore_header: "D-SCORE",
+        extra_blanco: "Extra Blanco Velden:",
+        width_gym: "Breedte Gymnast (px):",
+        height_gym: "Hoogte Gymnast (px):",
+        sort_date_new: "Datum (Nieuw)",
+        sort_date_old: "Datum (Oud)",
+        sort_name: "Naam (A-Z)",
+	visible_el: "Zichtbare Elementen (E-J):",
+    },
+    en: {
+        newComp: "+ Start New Competition",
+        settingsTitle: "Settings",
+        sidebarW: "Sidebar Width (px):",
+        topbarH: "Topbar Height (px):",
+        resetBtn: "Reset to Default",
+        myComp: "My Competitions",
+        gymnast: "Gymnast",
+        jury: "Judges",
+        avg_e: "AVG E",
+        neutral: "ND",
+        final: "Final Score",
+        elements: "Σ Elements",
+        groups: "Σ Groups",
+        stick: "Stick",
+        apparatus_label: "Apparatus",
+        dscore_header: "D-SCORE",
+        extra_blanco: "Extra Blank Fields:",
+        width_gym: "Gymnast Width (px):",
+        height_gym: "Gymnast Height (px):",
+        sort_date_new: "Date (New)",
+        sort_date_old: "Date (Old)",
+        sort_name: "Name (A-Z)",
+	visible_el: "Visible Elements (E-J):",
+    }
+};
+
+function openModal() { document.getElementById('modal-overlay').style.display = 'flex'; }
+function sluitModal() { document.getElementById('modal-overlay').style.display = 'none'; }
+
+function bevestigNieuweWedstrijd() {
+const naam = document.getElementById('new-comp-name').value;
+const type = document.getElementById('new-comp-type').value;
+if(!naam) { alert("Vul een naam in"); return; }
+const id = 'W' + Date.now();
+const lijst = JSON.parse(localStorage.getItem('ts_lijst') || '[]');
+const frozenVisSettings = { E: document.getElementById('show-E').checked, F: document.getElementById('show-F').checked, G: document.getElementById('show-G').checked, H: document.getElementById('show-H').checked, I: document.getElementById('show-I').checked, J: document.getElementById('show-J').checked, blancoCount: parseInt(document.getElementById('set-blanco-count').value) || 0, canvasW: parseInt(document.getElementById('set-canvas-w').value) || 200, canvasH: parseInt(document.getElementById('set-canvas-h').value) || 75 };
+lijst.push({id, naam, datum: new Date().toLocaleString(), formType: type, visSettings: frozenVisSettings});
+localStorage.setItem('ts_lijst', JSON.stringify(lijst));
+localStorage.setItem(id, JSON.stringify([]));
+sluitModal(); laadOverzicht(); openWedstrijd(id);
+}
+
+function changeLanguage() {
+    const lang = document.getElementById('set-lang').value;
+    const t = translations[lang];
+    document.getElementById('btn-new-competition').innerText = t.newComp;
+    document.getElementById('settings-title').innerText = t.settingsTitle;
+    document.getElementById('lbl-sidebar-w').innerText = t.sidebarW;
+    document.getElementById('lbl-topbar-h').innerText = t.topbarH;
+    document.getElementById('btn-reset-settings').innerText = t.resetBtn;
+    document.getElementById('my-competitions-title').innerText = t.myComp;
+    if(document.getElementById('lbl-blanco')) document.getElementById('lbl-blanco').innerText = t.extra_blanco;
+    if(document.getElementById('lbl-gym-w')) document.getElementById('lbl-gym-w').innerText = t.width_gym;
+    if(document.getElementById('lbl-gym-h')) document.getElementById('lbl-gym-h').innerText = t.height_gym;
+    const sidebarH3 = document.querySelector('.sidebar h3');
+    if(sidebarH3) sidebarH3.innerText = t.dscore_header;
+    const appLabel = document.querySelector('.apparatus-container label');
+    if(appLabel) appLabel.innerText = t.apparatus_label;
+    const appSelect = document.getElementById('apparatus-select');
+    Array.from(appSelect.options).forEach(opt => {
+        if(t[opt.value]) opt.text = t[opt.value];
+    });
+    const sortSelect = document.getElementById('sort-order');
+    if(sortSelect) {
+        sortSelect.options[0].text = t.sort_date_new;
+        sortSelect.options[1].text = t.sort_date_old;
+        sortSelect.options[2].text = t.sort_name;
+    }
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        if(t[key]) el.innerText = t[key];
+    });
+    localStorage.setItem('ts_lang', lang);
+}
+
+function fixComma(input) { input.value = input.value.replace(',', '.'); }
+
+function toggleSettings() { 
+    const panel = document.getElementById('settings-panel'); 
+    if (panel.style.display === 'block') {
+        panel.style.display = 'none';
+    } else {
+        panel.style.display = 'block';
+    }
+}
+
+function updateLayoutSettings() {
+const sw = document.getElementById('set-sidebar-w').value;
+const th = document.getElementById('set-topbar-h').value;
+document.documentElement.style.setProperty('--sidebar-width', sw + 'px');
+document.documentElement.style.setProperty('--topbar-height', th + 'px');
+localStorage.setItem('ts_layout', JSON.stringify({ sidebarW: sw, topbarH: th }));
+}
+
+function resetSettings() {
+document.getElementById('set-sidebar-w').value = 135;
+document.getElementById('set-topbar-h').value = 115;
+document.getElementById('set-canvas-w').value = 200;
+document.getElementById('set-canvas-h').value = 75;
+['E','F','G','H','I','J'].forEach(l => document.getElementById('show-'+l).checked = true);
+document.getElementById('set-blanco-count').value = 0;
+saveVisibilitySettings(); updateLayoutSettings(); updateBlancoOptions();
+}
+
+function laadLayoutSettings() {
+const layout = JSON.parse(localStorage.getItem('ts_layout') || '{"sidebarW": "135", "topbarH": "110"}');
+document.getElementById('set-sidebar-w').value = layout.sidebarW;
+document.getElementById('set-topbar-h').value = layout.topbarH;
+const lang = localStorage.getItem('ts_lang') || 'nl';
+document.getElementById('set-lang').value = lang;
+laadVisibilitySettings(); updateLayoutSettings(); changeLanguage();
+}
+
+function laadOverzicht() {
+const lijstData = JSON.parse(localStorage.getItem('ts_lijst') || '[]');
+const container = document.getElementById('wedstrijd-lijst');
+const order = document.getElementById('sort-order').value;
+let lijst = [...lijstData];
+if (order === 'new') { lijst.reverse(); }
+else if (order === 'name') { lijst.sort((a, b) => a.naam.localeCompare(b.naam)); }
+container.innerHTML = '';
+lijst.forEach(w => {
+container.innerHTML += `<div class="wedstrijd-item">
+<div class="wedstrijd-info" onclick="openWedstrijd('${w.id}')"><strong>${w.naam}</strong><small>${w.datum} | <b>${w.formType || 'FIG'}</b></small></div>
+<div class="export-actions"><button class="btn-action btn-edit" onclick="wijzigNaam('${w.id}')">EDIT</button>
+<button class="btn-action btn-pdf" onclick="exportWedstrijdPDF('${w.id}', '${w.naam}')">PDF</button>
+<button class="btn-action btn-excel" onclick="exportWedstrijdExcel('${w.id}', '${w.naam}')">EXCEL</button>
+<button class="btn-action btn-del" onclick="verwijderWedstrijd('${w.id}')">WIS</button></div></div>`;
+});
+}
+
+function wijzigNaam(id) {
+let lijst = JSON.parse(localStorage.getItem('ts_lijst') || '[]');
+const index = lijst.findIndex(w => w.id === id);
+const nieuweNaam = prompt("Nieuwe naam:", lijst[index].naam);
+if (nieuweNaam) { lijst[index].naam = nieuweNaam; localStorage.setItem('ts_lijst', JSON.stringify(lijst)); laadOverzicht(); }
+}
+
+function openWedstrijd(id) {
+huidigeWedstrijdId = id;
+database = JSON.parse(localStorage.getItem(id) || '[]');
+currentIndex = 0;
+const lijst = JSON.parse(localStorage.getItem('ts_lijst') || '[]');
+const wData = lijst.find(w => w.id === id);
+const type = wData ? wData.formType : 'FIG';
+const isNTS = type.includes('NTS');
+
+document.getElementById('b-score-container').style.display = isNTS ? 'flex' : 'none';
+document.getElementById('b-score-container2').style.display = isNTS ? 'flex' : 'none';
+
+const visSettings = wData.visSettings || JSON.parse(localStorage.getItem('ts_visibility') || '{"E":true,"F":true,"G":true,"H":true,"I":true,"J":true, "blancoCount": 0, "canvasW": 200, "canvasH": 75}');
+const nCanvas = document.getElementById('nameCanvas');
+nCanvas.style.width = (visSettings.canvasW || 200) + "px";
+nCanvas.style.height = (visSettings.canvasH || 75) + "px";
+let toonLetters = [];
+if (type === "FIG" || type === "NTS 1 & 2") {
+    const alleLetters = ['J','I','H','G','F','E','D','C','B','A'];
+    toonLetters = alleLetters.filter(l => visSettings.hasOwnProperty(l) ? visSettings[l] : true);
+} else if (type === "NTS 3") {
+    const alleLetters = ['J','I','H','G','F','E','D','C','B','A','TB','TA'];
+    toonLetters = alleLetters.filter(l => visSettings.hasOwnProperty(l) ? visSettings[l] : true);
+} else if (type === "NTS 4" || type === "NTS 5" || type === "NTS 6") {
+    toonLetters = ['D','C','B','A','TB','TA'];
+} else { toonLetters = [...letters]; }
+const listContainer = document.getElementById('el-list');
+listContainer.innerHTML = '';
+if (type === "FIG" || type === "NTS 1 & 2" || type === "NTS 3") {
+    const blancoCount = visSettings.blancoCount || 0;
+    const uitgevinkteLetters = ['J','I','H','G','F','E'].filter(l => !visSettings[l]);
+    for (let i = 0; i < blancoCount; i++) {
+        let options = `<option value="">-</option>`;
+        uitgevinkteLetters.forEach(l => { options += `<option value="${l}">${l}</option>`; });
+        listContainer.innerHTML += `<div class="element-row"><select id="valBlanco${i}" onchange="rekenen()" class="input-standard">${Array.from({length: 9}, (_, i) => `<option value="${i}">${i}</option>`).join('')}</select>
+        <select id="typeBlanco${i}" onchange="rekenen()" class="blanco-select">${options}</select><div class="line-sum" id="sumBlanco${i}">0.0</div></div>`;
+    }
+}
+toonLetters.forEach(l => { listContainer.innerHTML += `<div class="element-row"><select id="val${l}" onchange="rekenen()" class="input-standard">${Array.from({length: 9}, (_, i) => `<option value="${i}">${i}</option>`).join('')}</select><div class="letter-label">${l}</div><div class="line-sum" id="sum${l}">0.0</div></div>`; });
+document.getElementById('dashboard').style.display = 'none';
+document.getElementById('app-interface').style.display = 'flex';
+document.body.style.overflow = 'hidden';
+setTimeout(() => {
+    setupHighDPICanvas(document.getElementById('writeCanvas'));
+    setupHighDPICanvas(document.getElementById('nameCanvas'));
+    if(database.length > 0) loadState(0); else clearFields();
+    updateUI();
+}, 100);
+}
+
+function setupHighDPICanvas(canvas) {
+    const rect = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr); 
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+}
+
+function toonDashboard() { saveCurrent(); document.getElementById('dashboard').style.display = 'block'; document.getElementById('app-interface').style.display = 'none'; document.body.style.overflow = 'auto'; laadOverzicht(); }
+function verwijderWedstrijd(id) { if(confirm("Zeker weten?")) { let lijst = JSON.parse(localStorage.getItem('ts_lijst') || '[]'); lijst = lijst.filter(w => w.id !== id); localStorage.setItem('ts_lijst', JSON.stringify(lijst)); localStorage.removeItem(id); laadOverzicht(); } }
+
+/* --- CANVAS LOGICA --- */
+let drawing = false; let mode = 'pen'; let onlyPenMode = true; let currentColor = '#1C333E'; let activeCanvas = null; let p1 = { x: 0, y: 0 }; let p2 = { x: 0, y: 0 };
+function setMode(newMode) { mode = newMode; document.getElementById('penBtn').classList.toggle('active', mode === 'pen'); document.getElementById('eraserBtn').classList.toggle('active', mode === 'eraser'); }
+function togglePalmRejection() { onlyPenMode = !onlyPenMode; document.getElementById('palmBtn').classList.toggle('palm-locked', onlyPenMode); }
+function selectColor(color, element) { currentColor = color; document.querySelectorAll('.color-circle').forEach(c => c.classList.remove('active')); element.classList.add('active'); setMode('pen'); }
+function updateSizeDisplay(val) { document.getElementById('sizeValue').innerText = val; }
+function getPos(e, canvasEl) { const rect = canvasEl.getBoundingClientRect(); return { x: e.clientX - rect.left, y: e.clientY - rect.top, type: e.pointerType, buttons: e.buttons }; }
+
+['writeCanvas', 'nameCanvas'].forEach(id => {
+    const el = document.getElementById(id);
+    el.addEventListener('pointerdown', (e) => {
+	e.preventDefault();
+        const pos = getPos(e, el); if (onlyPenMode && pos.type !== 'pen') return;
+        drawing = true; activeCanvas = el; el.setPointerCapture(e.pointerId); p1 = pos; p2 = pos;
+    });
+    el.addEventListener('pointermove', (e) => {
+        if (!drawing || activeCanvas !== el) return; e.preventDefault();
+        const events = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+        const sPenBtnPressed = (e.buttons === 2 || e.buttons === 32); 
+        const activeEraser = (mode === 'eraser' || sPenBtnPressed);
+        let baseSize = parseFloat(document.getElementById('size').value) / 5;
+        if (el.id === 'nameCanvas') baseSize = Math.max(1, baseSize / 2);
+        
+        const ctx = el.getContext('2d');
+        ctx.lineWidth = activeEraser ? Math.max(baseSize * 6, 20) : baseSize; 
+        ctx.strokeStyle = activeEraser ? "#ffffff" : currentColor;
+        
+        events.forEach(ev => {
+             const pos = getPos(ev, el); ctx.beginPath();
+             const midPoint = { x: (p1.x + pos.x) / 2, y: (p1.y + pos.y) / 2 };
+             ctx.moveTo(p2.x, p2.y); ctx.quadraticCurveTo(p1.x, p1.y, midPoint.x, midPoint.y);
+             ctx.stroke(); p2 = midPoint; p1 = pos;
+        });
+    });
+    const stopDrawing = () => { drawing = false; activeCanvas = null; saveCurrent(); };
+    el.addEventListener('pointerup', (e) => {if(drawing) {e.preventDefault();drawing = false;}});
+           
+    el.addEventListener('pointercancel', stopDrawing);
+    el.addEventListener('contextmenu', e => e.preventDefault());
+});
+function buildEInputs() {
+    const container = document.getElementById('e-fields-container');
+    const panelSection = container.closest('.e-panel-section');
+    const count = parseInt(document.getElementById('juryCount').value);
+    const app = document.getElementById('apparatus-select').value;
+    
+    // Check form type for MB logic
+    const lijst = JSON.parse(localStorage.getItem('ts_lijst') || '[]');
+    const wData = lijst.find(w => w.id === huidigeWedstrijdId);
+    const type = wData ? wData.formType : 'FIG';
+    const isMB = (type === 'Middenbouw');
+    
+    const oldSpacer = document.getElementById('e-panel-spacer');
+    if (oldSpacer) oldSpacer.remove();
+
+    container.innerHTML = '';
+    panelSection.classList.remove('sticky-e-panel');
+    panelSection.style.position = "";
+    panelSection.style.left = "";
+    panelSection.style.width = "auto";
+    panelSection.style.visibility = "visible";
+
+    // Als MB en VT -> behandel als enkelvoudig toestel (1 rij)
+    if (app === 'VT' && !isMB) {
+        const row1 = document.createElement('div');
+        row1.className = 'vt-row';
+        for (let i = 1; i <= count; i++) {
+            const val = (database[currentIndex]?.eScores?.[i - 1]) || "0.0";
+            row1.innerHTML += `<div class="vt-input-col"><label class="vt-label">E${i}</label><input type="text" class="input-standard e-input e-row-1" value="${val}" inputmode="decimal" onfocus="this.select()" oninput="fixComma(this); rekenen();"></div>`;
+        }
+        container.appendChild(row1);
+
+        const row2 = document.createElement('div');
+        row2.className = 'vt-row';
+        for (let i = 1; i <= count; i++) {
+            const val = (database[currentIndex]?.eScores2?.[i - 1]) || "0.0";
+            row2.innerHTML += `<div class="vt-input-col"><label class="vt-label">E${i}</label><input type="text" class="input-standard e-input2 e-row-2" value="${val}" inputmode="decimal" onfocus="this.select()" oninput="fixComma(this); rekenen();"></div>`;
+        }
+        container.appendChild(row2);
+    } else {
+        const grid = document.createElement('div');
+        grid.className = 'standard-e-grid';
+        for (let i = 1; i <= count; i++) {
+            const val = (database[currentIndex]?.eScores?.[i - 1]) || "0.0";
+            grid.innerHTML += `<div class="vt-input-col"><label class="vt-label">E${i}</label><input type="text" class="input-standard e-input e-row-1" value="${val}" inputmode="decimal" onfocus="this.select()" oninput="fixComma(this); rekenen();"></div>`;
+        }
+        container.appendChild(grid);
+    }
+
+    if (app === 'VT' && !isMB && count >= 5) {
+        requestAnimationFrame(() => {
+            const rect = panelSection.getBoundingClientRect();
+            const width = rect.width;
+            const leftPos = rect.left;
+            const spacer = document.createElement('div');
+            spacer.id = 'e-panel-spacer';
+            spacer.style.width = width + "px";
+            spacer.style.height = "1px"; 
+            spacer.style.flexShrink = "0";
+            panelSection.parentNode.insertBefore(spacer, panelSection);
+            panelSection.classList.add('sticky-e-panel');
+            panelSection.style.left = leftPos + "px";
+            panelSection.style.width = width + "px";
+        });
+    }
+    rekenen();
+}
+function calculateAverageE(inputClass) {
+    const eInputs = Array.from(document.querySelectorAll(`.${inputClass}`));
+    const eScores = eInputs.map(input => { let val = input.value.replace(',', '.'); return val === "" ? 0 : parseFloat(val); });
+    eInputs.forEach(input => input.style.opacity = '1'); 
+    
+    let avgE = 0;
+    if (eScores.length > 0) {
+        if (eScores.length >= 4) {
+            let sortedIdx = eScores.map((val, idx) => ({val, idx})).sort((a, b) => a.val - b.val);
+            eInputs[sortedIdx[0].idx].style.opacity = '0.4'; 
+            eInputs[sortedIdx[sortedIdx.length - 1].idx].style.opacity = '0.4';
+            let sum = eScores.reduce((a, b) => a + b, 0) - eScores[sortedIdx[0].idx] - eScores[sortedIdx[sortedIdx.length-1].idx];
+            avgE = sum / (eScores.length - 2);
+        } else { 
+            avgE = eScores.reduce((a, b) => a + b, 0) / eScores.length; 
+        }
+    }
+    return avgE;
+}
+
+function getVisibleFloat(id) {
+    const el = document.getElementById(id);
+    if (!el || el.offsetParent === null) return 0.0;
+    return parseFloat(el.value.replace(',', '.')) || 0.0;
+}
+
+function rekenen() {
+    const apparatus = document.getElementById('apparatus-select').value;
+    const lijst = JSON.parse(localStorage.getItem('ts_lijst') || '[]');
+    const wData = lijst.find(w => w.id === huidigeWedstrijdId);
+    const type = wData ? wData.formType : 'FIG';
+    const isVT = (apparatus === 'VT');
+
+    if (type === 'Middenbouw') {
+        // --- LOGICA VOOR MIDDENBOUW ---
+        // D-score is de som van de trajecten
+        let dScore = 0;
+        for (let i = 1; i <= 5; i++) {
+            const el = document.getElementById('mb-traj-' + i);
+            if(el && el.parentElement.style.display !== 'none') {
+                 dScore += parseFloat(el.value);
+            }
+        }
+        
+        const avgE = calculateAverageE('e-row-1');
+        document.getElementById('avgE').innerText = avgE.toFixed(3);
+        
+        document.getElementById('mb-totaal').innerText = dScore.toFixed(3);
+        
+        // Final score: (10 - E) + D + Stick + Bonus - Neutral
+        // Uses getVisibleFloat to ignore hidden fields
+        const nValue = getVisibleFloat('neutraal');
+        const bValue = getVisibleFloat('b_score');
+        const stickValue = getVisibleFloat('mb-stick');
+        
+        const finalScore = (10.000 - avgE) + dScore + stickValue + bValue - nValue;
+        document.getElementById('eindCijfer').innerText = finalScore.toFixed(3);
+
+    } else if (isVT) {
+        // --- LOGICA VOOR STANDAARD SPRONG (VT) ---
+        const d1 = parseFloat(document.getElementById('vt-d1').value.replace(',', '.')) || 0;
+        const avgE1 = calculateAverageE('e-row-1');
+        document.getElementById('avgE').innerText = avgE1.toFixed(3);
+        const stick1 = getVisibleFloat('vt-stick1');
+        const n1 = getVisibleFloat('neutraal');
+        const b1 = getVisibleFloat('b_score');
+        const score1 = (10.000 - avgE1) + d1 + stick1 + b1 - n1;
+
+        const d2 = parseFloat(document.getElementById('vt-d2').value.replace(',', '.')) || 0;
+        const avgE2 = calculateAverageE('e-row-2');
+        document.getElementById('avgE2').innerText = avgE2.toFixed(3);
+        const stick2 = getVisibleFloat('vt-stick2');
+        const n2 = getVisibleFloat('vt-neutraal2');
+        const b2 = getVisibleFloat('vt-b-score2');
+        const score2 = (10.000 - avgE2) + d2 + stick2 + b2 - n2;
+
+        document.getElementById('eindCijfer').innerHTML = `${score1.toFixed(3)}<br><small style="color:#666">${score2.toFixed(3)}</small>`;
+        document.getElementById('totaal').innerText = "MANUAL";
+        document.getElementById('counter-msg').style.display = 'none';
+
+    } else {
+        // --- STANDAARD LOGICA (OVERIG) ---
+        let maxElem = 8;
+        if(type === "NTS 3") maxElem = 7; if(type === "NTS 4") maxElem = 7; if(type === "NTS 5") maxElem = 6; if(type === "NTS 6") maxElem = 5;
+        
+        let alleElementen = []; let totaalIngevoerd = 0;
+        for (let i = 0; i < 6; i++) {
+            const elVal = document.getElementById('valBlanco' + i);
+            const elType = document.getElementById('typeBlanco' + i);
+            if (elVal && elType && elType.value !== "") {
+                const aantal = parseInt(elVal.value) || 0; const waarde = values[elType.value]; totaalIngevoerd += aantal;
+                for (let j = 0; j < aantal; j++) { alleElementen.push(waarde); }
+                document.getElementById('sumBlanco' + i).innerText = (aantal * waarde).toFixed(1);
+            }
+        }
+        letters.forEach(l => {
+            const el = document.getElementById('val' + l);
+            if(el) {
+                const aantal = parseInt(el.value) || 0; totaalIngevoerd += aantal;
+                for(let i=0; i<aantal; i++) { alleElementen.push(values[l]); }
+                document.getElementById('sum' + l).innerText = (aantal * values[l]).toFixed(1);
+            }
+        });
+        alleElementen.sort((a, b) => b - a);
+        const elemScore = alleElementen.slice(0, maxElem).reduce((a, b) => a + b, 0);
+        
+        const avgE = calculateAverageE('e-row-1');
+        document.getElementById('avgE').innerText = avgE.toFixed(3);
+
+        const groepenTotaal = parseFloat(document.getElementById('grI').value) + parseFloat(document.getElementById('grIV').value) + Array.from(document.querySelectorAll('.cr')).reduce((a,b)=>a+parseFloat(b.value),0);
+        
+        const cvVal = getVisibleFloat('cv');
+        const dTotaal = elemScore + groepenTotaal + cvVal;
+        
+        document.getElementById('sub-elem').innerText = elemScore.toFixed(1);
+        document.getElementById('sub-groups').innerText = groepenTotaal.toFixed(1);
+        document.getElementById('counter-msg').style.display = 'block';
+        document.getElementById('counter-msg').innerText = `${totaalIngevoerd} / ${maxElem}`;
+        
+        if (totaalIngevoerd > maxElem) {
+            document.getElementById('counter-msg').className = 'invalid'; document.getElementById('totaal').innerText = "ERROR"; document.getElementById('eindCijfer').innerText = "ERROR";
+        } else {
+            document.getElementById('counter-msg').className = 'valid'; document.getElementById('totaal').innerText = dTotaal.toFixed(3);
+            const nValue = getVisibleFloat('neutraal');
+            const bValue = getVisibleFloat('b_score');
+            const stickValue = getVisibleFloat('stickBonus');
+            
+            const finalScore = (10.000 - avgE) + dTotaal + stickValue + bValue - nValue;
+            document.getElementById('eindCijfer').innerText = finalScore.toFixed(3);
+        }
+    }
+    saveCurrent();
+}
+
+function saveCurrent() {
+if(!huidigeWedstrijdId) return;
+const blancoValues = []; const blancoTypes = [];
+for(let i=0; i<6; i++) {
+    const v = document.getElementById('valBlanco'+i); const t = document.getElementById('typeBlanco'+i);
+    blancoValues.push(v ? v.value : "0"); blancoTypes.push(t ? t.value : "");
+}
+// Middenbouw waardes verzamelen
+const mbTraj = [];
+for(let i=1; i<=5; i++) {
+    const el = document.getElementById('mb-traj-'+i);
+    mbTraj.push(el ? el.value : "0.0");
+}
+
+database[currentIndex] = {
+apparatus: document.getElementById('apparatus-select').value,
+juryCount: document.getElementById('juryCount').value,
+eValues: Array.from(document.querySelectorAll('.e-row-1')).map(i => i.value),
+eValues2: Array.from(document.querySelectorAll('.e-row-2')).map(i => i.value),
+avgE: document.getElementById('avgE').innerText, stick: document.getElementById('stickBonus').value, neutraal: document.getElementById('neutraal').value, b_score: document.getElementById('b_score').value, cv: document.getElementById('cv').value, dScore: document.getElementById('totaal').innerText, subElem: document.getElementById('sub-elem').innerText, subGroups: document.getElementById('sub-groups').innerText, eindScore: document.getElementById('eindCijfer').innerText, // De tekst (kan html bevatten)
+elements: letters.map(l => document.getElementById('val' + l) ? document.getElementById('val' + l).value : "0"), blancoVals: blancoValues, blancoTyps: blancoTypes,
+groups: [document.getElementById('grI').value, ...Array.from(document.querySelectorAll('.cr')).map(c => c.value), document.getElementById('grIV').value],
+canvasData: document.getElementById('writeCanvas').toDataURL('image/png'), nameCanvasData: document.getElementById('nameCanvas').toDataURL('image/png'),
+vt_d1: document.getElementById('vt-d1').value,
+vt_d2: document.getElementById('vt-d2').value,
+vt_stick1: document.getElementById('vt-stick1').value,
+vt_stick2: document.getElementById('vt-stick2').value,
+vt_neutraal2: document.getElementById('vt-neutraal2').value,
+vt_b_score2: document.getElementById('vt-b-score2').value,
+mb_traj: mbTraj,
+mb_stick: document.getElementById('mb-stick').value
+};
+localStorage.setItem(huidigeWedstrijdId, JSON.stringify(database));
+}
+
+function loadState(index) {
+const s = database[index]; if(!s) return;
+document.getElementById('apparatus-select').value = s.apparatus;
+document.getElementById('juryCount').value = s.juryCount; 
+updateApparatusImage(); 
+
+const eInputs = document.querySelectorAll('.e-row-1');
+s.eValues.forEach((v, i) => { if(eInputs[i]) eInputs[i].value = v; });
+
+if(s.apparatus === 'VT' && s.eValues2) {
+    const eInputs2 = document.querySelectorAll('.e-row-2');
+    s.eValues2.forEach((v, i) => { if(eInputs2[i]) eInputs2[i].value = v; });
+    document.getElementById('vt-d1').value = s.vt_d1 || "0.0";
+    document.getElementById('vt-d2').value = s.vt_d2 || "0.0";
+    document.getElementById('vt-stick1').value = s.vt_stick1 || "0";
+    document.getElementById('vt-stick2').value = s.vt_stick2 || "0";
+    document.getElementById('vt-neutraal2').value = s.vt_neutraal2 || "0.0";
+    document.getElementById('vt-b-score2').value = s.vt_b_score2 || "0.0";
+}
+
+document.getElementById('stickBonus').value = s.stick; document.getElementById('neutraal').value = s.neutraal;
+document.getElementById('b_score').value = s.b_score || "0.0"; document.getElementById('cv').value = s.cv;
+letters.forEach((l, i) => { if(document.getElementById('val' + l)) document.getElementById('val' + l).value = s.elements[i]; });
+if(s.blancoVals) {
+    for(let i=0; i<6; i++) { const v = document.getElementById('valBlanco'+i); const t = document.getElementById('typeBlanco'+i); if(v) v.value = s.blancoVals[i]; if(t) t.value = s.blancoTyps[i]; }
+}
+const gFields = [document.getElementById('grI'), ...Array.from(document.querySelectorAll('.cr')), document.getElementById('grIV')];
+gFields.forEach((f, i) => f.value = s.groups[i]);
+
+if(s.mb_traj) {
+    s.mb_traj.forEach((v, i) => {
+        const el = document.getElementById('mb-traj-' + (i+1));
+        if(el) el.value = v;
+    });
+}
+
+document.getElementById('mb-stick').value = s.mb_stick || "0";
+
+redrawCanvas(s.canvasData, 'writeCanvas'); redrawCanvas(s.nameCanvasData, 'nameCanvas');
+rekenen();
+}
+
+function redrawCanvas(dataURL, canvasId) {
+    const canvas = document.getElementById(canvasId); const ctx = canvas.getContext('2d');
+    ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, canvas.width, canvas.height); ctx.restore();
+    if(!dataURL || dataURL === "data:,") return;
+    const img = new Image(); img.src = dataURL; 
+    img.onload = () => { const dpr = window.devicePixelRatio || 1; ctx.drawImage(img, 0, 0, canvas.width / dpr, canvas.height / dpr); };
+}
+
+function goNext() { saveCurrent(); currentIndex++; if (!database[currentIndex]) clearFields(); else loadState(currentIndex); updateUI(); }
+function goPrevious() { saveCurrent(); if (currentIndex > 0) { currentIndex--; loadState(currentIndex); } updateUI(); }
+
+function clearFields() {
+    ['writeCanvas', 'nameCanvas'].forEach(id => { const c = document.getElementById(id); const ctx = c.getContext('2d'); ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0,0,c.width,c.height); ctx.restore(); });
+    updateApparatusImage();
+    
+    document.getElementById('neutraal').value = "0.0"; document.getElementById('b_score').value = "0.0"; document.getElementById('cv').value = "0"; document.getElementById('stickBonus').value = "0";
+    document.getElementById('vt-d1').value = "0.0"; document.getElementById('vt-d2').value = "0.0";
+    document.getElementById('vt-stick1').value = "0"; document.getElementById('vt-stick2').value = "0";
+    document.getElementById('vt-neutraal2').value = "0.0"; document.getElementById('vt-b-score2').value = "0.0";
+
+    letters.forEach(l => { if(document.getElementById('val' + l)) document.getElementById('val' + l).value = "0"; });
+    for(let i=0; i<6; i++) { const v = document.getElementById('valBlanco'+i); const t = document.getElementById('typeBlanco'+i); if(v) v.value = "0"; if(t) t.value = ""; }
+    document.getElementById('grI').value = "0.0"; document.getElementById('grIV').value = "0.0"; document.querySelectorAll('.cr').forEach(c => c.value = "0.0");
+    
+    // Reset Middenbouw dropdowns
+    for(let i=1; i<=5; i++) {
+        const el = document.getElementById('mb-traj-' + i);
+        if(el) el.value = "0.0";
+    }
+    document.getElementById('mb-stick').value = "0";
+    
+    rekenen();
+}
+
+function updateUI() { document.getElementById('page-info').innerText = `${currentIndex + 1}/${Math.max(database.length, currentIndex + 1)}`; document.getElementById('btnPrev').disabled = currentIndex === 0; }
+
+async function exportWedstrijdExcel(id, naam) {
+const data = JSON.parse(localStorage.getItem(id) || '[]'); if(data.length === 0) return;
+const lijst = JSON.parse(localStorage.getItem('ts_lijst') || '[]');
+const wData = lijst.find(w => w.id === id); const formType = wData ? wData.formType : 'FIG';
+const isMB = (formType === 'Middenbouw');
+const workbook = new ExcelJS.Workbook(); const worksheet = workbook.addWorksheet('Resultaten');
+worksheet.columns = [{ header: 'Gymnast', key: 'img', width: 15 }, { header: 'Toestel', key: 'apparatus', width: 10 }, { header: 'D-Score', key: 'dscore', width: 10 }, { header: 'Σ Elementen', key: 'sumElem', width: 12 }, { header: 'Σ Groepen', key: 'sumGroup', width: 12 }, { header: 'CV', key: 'cv', width: 6 }, { header: 'Stick', key: 'stick', width: 7 }, { header: 'B-Score', key: 'bscore', width: 8 }, { header: 'N-Score', key: 'nscore', width: 8 }, { header: 'I', key: 'g1', width: 5 }, { header: 'II', key: 'g2', width: 5 }, { header: 'III', key: 'g3', width: 5 }, { header: 'IV', key: 'g4', width: 5 }, { header: 'TA', key: 'eTA', width: 4 }, { header: 'TB', key: 'eTB', width: 4 }, { header: 'A', key: 'eA', width: 4 }, { header: 'B', key: 'eB', width: 4 }, { header: 'C', key: 'eC', width: 4 }, { header: 'D', key: 'eD', width: 4 }, { header: 'E', key: 'eE', width: 4 }, { header: 'F', key: 'eF', width: 4 }, { header: 'G', key: 'eG', width: 4 }, { header: 'H', key: 'eH', width: 4 }, { header: 'I', key: 'eI', width: 4 }, { header: 'J', key: 'eJ', width: 4 }, { header: 'E1', key: 'E1', width: 5 }, { header: 'E2', key: 'E2', width: 5 }, { header: 'E3', key: 'E3', width: 5 }, { header: 'E4', key: 'E4', width: 5 }, { header: 'E5', key: 'E5', width: 5 }, { header: 'E6', key: 'E6', width: 5 }, { header: 'E7', key: 'E7', width: 5 }, { header: 'E-Aftrek', key: 'eavg', width: 10 }, { header: 'Eindcijfer', key: 'final', width: 12 }];
+worksheet.getRow(1).font = { bold: true };
+for (let i = 0; i < data.length; i++) {
+const gym = data[i]; const rowNum = i + 2; const row = worksheet.getRow(rowNum);
+let counts = { 'J': parseInt(gym.elements[0]) || 0, 'I': parseInt(gym.elements[1]) || 0, 'H': parseInt(gym.elements[2]) || 0, 'G': parseInt(gym.elements[3]) || 0, 'F': parseInt(gym.elements[4]) || 0, 'E': parseInt(gym.elements[5]) || 0, 'D': parseInt(gym.elements[6]) || 0, 'C': parseInt(gym.elements[7]) || 0, 'B': parseInt(gym.elements[8]) || 0, 'A': parseInt(gym.elements[9]) || 0, 'TB': parseInt(gym.elements[10]) || 0, 'TA': parseInt(gym.elements[11]) || 0 };
+if (gym.blancoVals && gym.blancoTyps) { for (let b = 0; b < 6; b++) { const type = gym.blancoTyps[b]; const val = parseInt(gym.blancoVals[b]) || 0; if (type && counts.hasOwnProperty(type)) { counts[type] += val; } } }
+// D-score mapping for MB
+let finalD = gym.dScore;
+if(isMB && gym.mb_traj) {
+    // In MB the visible dScore in UI is calculated manually
+    finalD = document.getElementById('mb-totaal') ? gym.dScore : gym.dScore; // Just using stored dScore
+}
+
+row.values = {apparatus: gym.apparatus, dscore: finalD, sumElem: gym.subElem, sumGroup: gym.subGroups, g1: gym.groups[0], g2: gym.groups[1], g3: gym.groups[2], g4: gym.groups[3], cv: gym.cv, stick: (isMB) ? (gym.mb_stick || gym.stick) : gym.stick, bscore: (formType.includes('NTS') || isMB) ? gym.b_score : '', nscore: gym.neutraal, eTA: counts['TA'], eTB: counts['TB'], eA: counts['A'], eB: counts['B'], eC: counts['C'], eD: counts['D'], eE: counts['E'], eF: counts['F'], eG: counts['G'], eH: counts['H'], eI: counts['I'], eJ: counts['J'], E1: gym.eValues[0] || '', E2: gym.eValues[1] || '', E3: gym.eValues[2] || '', E4: gym.eValues[3] || '', E5: gym.eValues[4] || '', E6: gym.eValues[5] || '', E7: gym.eValues[6] || '', eavg: gym.avgE, final: gym.eindScore.replace('<br>', ' | ').replace(/<[^>]*>/g, '') };
+if (gym.nameCanvasData && gym.nameCanvasData !== "data:,") { const imageId = workbook.addImage({ base64: gym.nameCanvasData, extension: 'png' }); worksheet.addImage(imageId, { tl: { col: 0.1, row: rowNum - 0.9 }, ext: { width: 100, height: 60 } }); }
+row.height = 50; row.alignment = { vertical: 'middle', horizontal: 'center' };
+}
+const buffer = await workbook.xlsx.writeBuffer(); saveAs(new Blob([buffer]), `${naam}_Export.xlsx`);
+}
+
+function updateApparatusImage() {
+    const apparatus = document.getElementById('apparatus-select').value;
+    const imgElement = document.getElementById('apparatus-display-img');
+    const canvas = document.getElementById('writeCanvas');
+    const stickContainer = document.querySelector('.bonus-box label[data-i18n="stick"]').parentElement;
+    
+    // Ophalen wedstrijd data
+    const lijst = JSON.parse(localStorage.getItem('ts_lijst') || '[]');
+    const wData = lijst.find(w => w.id === huidigeWedstrijdId);
+    const type = wData ? wData.formType : 'FIG';
+    const isMB = (type === 'Middenbouw');
+    const isVT = (apparatus === 'VT');
+
+    // 1. Sidebar Logica
+    if (isMB) {
+        // Middenbouw Logica
+        document.getElementById('standard-sidebar-content').classList.add('vt-hidden');
+        document.getElementById('vt-sidebar-content').classList.add('vt-hidden'); // Nooit standaard VT sidebar bij MB
+        document.getElementById('mb-sidebar-content').classList.remove('vt-hidden');
+        
+        document.getElementById('avgE2').classList.add('vt-hidden'); // MB heeft geen 2e sprong score nodig
+        document.getElementById('vt-modifiers-top').classList.add('vt-hidden');
+        
+        // Dynamisch de dropdown opties aanpassen
+        const trajs = [1, 2, 3, 4, 5];
+        let options = "";
+        let visibleCount = 5;
+        
+        // Stick bonus visibility for MB
+        const mbStickBox = document.getElementById('mb-stick-box');
+        
+        if(apparatus === 'PH') {
+            // Voltige: 2 trajecten (2.5, 3.0, 3.5, 4.0)
+            options = `<option value="0.0">0.0</option><option value="2.5">2.5</option><option value="3.0">3.0</option><option value="3.5">3.5</option><option value="4.0">4.0</option>`;
+            visibleCount = 2;
+            mbStickBox.style.display = 'none'; // Geen stick bij voltige
+        } else if (apparatus === 'VT') {
+            // Sprong: 1 traject (5.0, 5.8, 6.5, 7.3, 8.0)
+            options = `<option value="0.0">0.0</option><option value="5.0">5.0</option><option value="5.8">5.8</option><option value="6.5">6.5</option><option value="7.3">7.3</option><option value="8.0">8.0</option>`;
+            visibleCount = 1;
+            mbStickBox.style.display = 'none'; // Geen stick bij sprong (in MB context zoals gevraagd)
+        } else {
+            // Overig (FX, SR, PB, HB): 5 trajecten (1.0, 1.3, 1.6)
+            options = `<option value="0.0">0.0</option><option value="1.0">1.0</option><option value="1.3">1.3</option><option value="1.6">1.6</option>`;
+            visibleCount = 5;
+            mbStickBox.style.display = 'flex'; // Wel stick
+        }
+        
+        trajs.forEach(i => {
+            const box = document.getElementById('mb-traj-' + i + '-box');
+            const select = document.getElementById('mb-traj-' + i);
+            if(box && select) {
+                select.innerHTML = options;
+                
+                if(i <= visibleCount) {
+                    box.style.display = 'flex';
+                } else {
+                    box.style.display = 'none';
+                    select.value = "0.0"; 
+                }
+            }
+        });
+
+    } else {
+        // Bestaande Logica
+        document.getElementById('mb-sidebar-content').classList.add('vt-hidden');
+        if (isVT) {
+            document.getElementById('standard-sidebar-content').classList.add('vt-hidden');
+            document.getElementById('vt-sidebar-content').classList.remove('vt-hidden');
+            document.getElementById('avgE2').classList.remove('vt-hidden');
+            document.getElementById('vt-modifiers-top').classList.remove('vt-hidden');
+        } else {
+            document.getElementById('standard-sidebar-content').classList.remove('vt-hidden');
+            document.getElementById('vt-sidebar-content').classList.add('vt-hidden');
+            document.getElementById('avgE2').classList.add('vt-hidden');
+            document.getElementById('vt-modifiers-top').classList.add('vt-hidden');
+        }
+    }
+
+    // Specifieke aanpassing voor FX Groep 4 options
+    const grIV = document.getElementById('grIV');
+    if (apparatus === 'FX') {
+        grIV.innerHTML = `<option value="0.0">0.0</option><option value="0.3">0.3</option><option value="0.5">0.5</option>`;
+    } else {
+        grIV.innerHTML = `<option value="0.0">0.0</option><option value="0.1">0.1</option><option value="0.2">0.2</option><option value="0.3">0.3</option><option value="0.4">0.4</option><option value="0.5">0.5</option>`;
+    }
+
+    if (apparatus === 'PH') {
+        stickContainer.style.display = 'none';
+        document.getElementById('stickBonus').value = "0";
+    } else {
+        stickContainer.style.display = 'flex';
+    }
+
+    buildEInputs();
+
+    // 2. Afbeeldingen laden
+    const images = {
+        'FX': 'Vloer.jpg', 'PH': 'Voltige.jpg', 'SR': 'Ringen.jpg',
+        'VT': 'Sprong.jpg', 'PB': 'Brug.jpg', 'HB': 'Rek.jpg'
+    };
+
+    if (images[apparatus]) {
+        imgElement.src = images[apparatus];
+        imgElement.style.display = 'block';
+        imgElement.style.opacity = "1";
+    } else {
+        imgElement.style.display = 'none';
+    }
+
+    // 3. VT Lijnen tekenen
+    if (isVT && canvas) {
+        setupHighDPICanvas(canvas);
+        requestAnimationFrame(() => {
+            const rect = canvas.getBoundingClientRect();
+            const w = rect.width; const h = rect.height; const midX = w / 2; const midY = h / 2;
+            const ctx = canvas.getContext('2d');
+            ctx.save();
+            ctx.strokeStyle = "#000000"; ctx.lineWidth = 2; ctx.lineCap = "round"; ctx.lineJoin = "round";
+            
+            const seg = 100; const diag = 70.7; const symW = diag + seg + diag + seg;
+            function drawSymbol(x, y) {
+                ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + diag, y - diag); ctx.lineTo(x + diag + seg, y - diag); ctx.lineTo(x + diag + seg + diag, y); ctx.lineTo(x + diag + seg + diag + seg, y); ctx.stroke();
+            }
+
+            if (isMB) {
+                // MB Sprong: 1 symbool in het midden, geen scheidslijn
+                drawSymbol((midX) - (symW / 2), midY);
+            } else {
+                // Standaard Sprong: 2 symbolen met scheidslijn
+                ctx.beginPath(); ctx.moveTo(midX, 0); ctx.lineTo(midX, h); ctx.stroke();
+                drawSymbol((midX / 2) - (symW / 2), midY);
+                drawSymbol(midX + (midX / 2) - (symW / 2), midY);
+            }
+            
+            ctx.restore();
+        });
+    }
+}
+window.onload = () => { laadLayoutSettings(); laadOverzicht(); };
+</script>
+</body>
+</html>
