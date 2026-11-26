@@ -4,33 +4,21 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0, viewport-fit=cover">
 <title>TH TurnScore Pro</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
+<!-- Bibliotheken staan lokaal in /libs zodat PDF- en Excel-export ook offline werken. -->
+<script src="libs/jspdf.umd.min.js" defer></script>
+<script src="libs/html2canvas.min.js" defer></script>
+<script src="libs/FileSaver.min.js" defer></script>
+<script src="libs/exceljs.min.js" defer></script>
 
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="TurnScore">
 <meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#1a73e8">
 
-<link rel="manifest" href='data:application/manifest+json;base64,ewogICJuYW1lIjogIlRIIFR1cm5TY29yZSBQcm8iLAogICJzaG9ydF9uYW1lIjogIlR1cm5TY29yZSIsCiAgImRpc3BsYXkiOiAiZnVsbHNjcmVlbiIsCiAgInN0YXJ0X3VybCI6ICIuIiwKICAiYmFja2dyb3VuZF9jb2xvciI6ICIjZmZmZmZmIiwKICAidGhlbWVfY29sb3IiOiAiIzFhNzNlOCIsCiAgImljb25zIjogW3sKICAgICJzcmMiOiAiaHR0cHM6Ly9jZG4taWNvbnMtcG5nLmZsaXRpY29uLmNvbS81MTIvMjkwNi8yOTA2OTkxLnBuZyIsCiAgICAic2l6ZXMiOiAiNTEyeDUxMiIsCiAgICAidHlwZSI6ICJpbWFnZS9wbmciCiAgfV0KfQ=='>
-
-<script>
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    const swCode = `
-      const CACHE_NAME = 'turnscore-v2.0';
-      self.addEventListener('install', e => {
-        e.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(['./'])));
-      });
-      self.addEventListener('fetch', e => {
-        e.respondWith(caches.match(e.request).then(res => res || fetch(e.request)));
-      });`;
-    const blob = new Blob([swCode], {type: 'text/javascript'});
-    navigator.serviceWorker.register(URL.createObjectURL(blob));
-  });
-}
-</script>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 
 <style>
 html, body {
@@ -65,7 +53,9 @@ input[readonly] {
 }
 #dashboard-logo { position: absolute; top: 20px; left: 20px; height: 80px; width: auto; object-fit: contain; }
 @media (max-width: 600px) { #dashboard h1 { margin-top: 50px; } }
-#dashboard { padding: 20px; max-width: 1100px; margin: 0 auto; display: block; font-family: 'Segoe UI', sans-serif; position: relative; min-height: 100vh; overflow-y: auto; }
+/* Het dashboard is zelf de scrollcontainer, zodat de lijst ook met de vinger scrollt (html/body blokkeren touch). */
+#dashboard { display: block; height: 100vh; height: 100dvh; overflow-y: auto; overflow-x: hidden; touch-action: pan-y; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; font-family: 'Segoe UI', sans-serif; }
+.dashboard-inner { padding: 20px; max-width: 1100px; margin: 0 auto; position: relative; }
 .btn-settings-icon { position: absolute; top: 20px; right: 20px; background: #eee; border: 1px solid #ccc; border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 20px; transition: background 0.2s; z-index: 100; }
 .btn-settings-icon:hover { background: #ddd; }
 .card { background: #f9f9f9; padding: 20px; border-radius: 10px; border: 1px solid #ddd; margin-bottom: 20px; }
@@ -433,13 +423,64 @@ input[type="range"] { cursor: pointer; accent-color: #1a73e8; width: 50px; heigh
 
 /* TIMER PER OEFENING */
 .exercise-timer{display:flex;flex-direction:column;align-items:center;gap:4px;margin-left:auto;margin-right:auto;padding:5px 7px;background:#f4f4f4;border:1px solid #d7d7d7;border-radius:6px;flex-shrink:0}.exercise-timer-label{font-size:9px;font-weight:bold;text-transform:uppercase;color:#555}#exercise-timer-display{min-width:74px;text-align:center;font-size:18px;line-height:1;font-weight:700;font-variant-numeric:tabular-nums}.exercise-timer-controls{display:flex;gap:3px}.timer-btn{height:24px;min-width:38px;padding:0 6px;border:1px solid #aaa;border-radius:4px;background:#fff;font-size:10px;font-weight:700;cursor:pointer}.timer-btn-start{background:#e8f5e9;border-color:#66a96c}.timer-btn-stop{background:#ffebee;border-color:#c96b73}.timer-btn-reset{background:#fff3e0;border-color:#d99a45}.timer-btn:active{transform:scale(.96)}
+
+/* --- BACKUP KAART --- */
+.backup-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.backup-text strong { display: block; font-size: 16px; color: #2c3e50; }
+.backup-text small { color: #7f8c8d; font-size: 12px; }
+.backup-buttons { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn-backup { background: #27ae60; color: #fff; border: 1px solid #27ae60; border-radius: 8px; padding: 10px 14px; font-size: 14px; font-weight: bold; cursor: pointer; font-family: inherit; }
+.btn-backup-secondary { background: #fff; color: #2c3e50; border-color: #2c3e50; }
+.backup-info { margin: 10px 0 0; font-size: 12px; color: #555; }
+.app-info { margin-top: 12px; font-size: 12px; color: #7f8c8d; text-align: center; }
+.btn-results { grid-column: 1 / -1; background: #2c3e50; color: #fff; border: none; }
+.empty-list { grid-column: 1 / -1; color: #7f8c8d; font-size: 13px; margin: 0; }
+
+/* --- UITSLAGENOVERZICHT --- */
+#results-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 12000; justify-content: center; align-items: center; padding: 16px; box-sizing: border-box; }
+.results-panel { background: #fff; border-radius: 10px; width: min(980px, 100%); max-height: 100%; display: flex; flex-direction: column; box-shadow: 0 4px 20px rgba(0,0,0,0.25); font-family: 'Segoe UI', sans-serif; overflow: hidden; }
+.results-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 8px 8px 16px; border-bottom: 1px solid #eee; }
+.results-header h3 { font-size: 16px; margin: 0; border: none; text-align: left; overflow-wrap: anywhere; }
+.results-close { background: none; border: none; font-size: 20px; cursor: pointer; width: 44px; height: 44px; flex-shrink: 0; }
+.results-controls { display: flex; flex-wrap: wrap; gap: 8px 14px; padding: 10px 16px; background: #f9f9f9; border-bottom: 1px solid #eee; font-size: 12px; font-weight: bold; }
+.results-controls label { display: flex; align-items: center; gap: 6px; }
+.results-controls select { width: auto; min-width: 90px; height: 34px; font-size: 13px; }
+.results-body { overflow: auto; touch-action: pan-x pan-y; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; flex: 1 1 auto; min-height: 0; }
+.results-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.results-table th { position: sticky; top: 0; background: #2c3e50; color: #fff; padding: 8px 6px; font-size: 11px; text-transform: uppercase; text-align: left; z-index: 1; white-space: nowrap; }
+.results-table td { padding: 6px; border-bottom: 1px solid #eee; vertical-align: middle; }
+.results-table .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.results-table .res-rank { font-weight: bold; font-size: 15px; width: 36px; text-align: center; }
+.results-table .res-final { font-weight: bold; font-size: 15px; }
+.results-table .res-error { color: #c62828; }
+.res-group-row td { background: #eef2f7; font-weight: bold; color: #1565c0; font-size: 12px; text-transform: uppercase; }
+.res-name-cell { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.res-name-cell img { height: 36px; max-width: 160px; object-fit: contain; background: #fdfdfd; border: 1px solid #eee; border-radius: 3px; }
+.res-name-input { width: 150px; height: 34px; padding: 4px 8px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px; font-family: inherit; box-sizing: border-box; }
+.res-open-btn { background: #1a73e8; color: #fff; border: none; border-radius: 4px; min-width: 44px; height: 34px; padding: 0 10px; font-weight: bold; cursor: pointer; font-size: 12px; white-space: nowrap; font-family: inherit; }
+.results-note { padding: 8px 16px; font-size: 12px; color: #7f8c8d; border-top: 1px solid #eee; }
+.results-note:empty { display: none; }
+.results-empty { padding: 24px; text-align: center; color: #7f8c8d; }
+
+/* --- UPDATE MELDING --- */
+#update-banner { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 13000; display: flex; align-items: center; gap: 10px; background: #2c3e50; color: #fff; padding: 8px 8px 8px 16px; border-radius: 10px; box-shadow: 0 6px 20px rgba(0,0,0,0.3); font-family: 'Segoe UI', sans-serif; font-size: 14px; max-width: calc(100% - 32px); box-sizing: border-box; }
+#update-banner[hidden] { display: none; }
+#update-banner button { border: none; border-radius: 6px; min-height: 36px; padding: 0 12px; font-weight: bold; cursor: pointer; font-family: inherit; font-size: 14px; }
+#update-banner .update-go { background: #27ae60; color: #fff; }
+#update-banner .update-dismiss { background: transparent; color: #fff; font-size: 16px; }
+
+/* --- EXTRA KNOPPEN BIJ PAGINA-NAVIGATIE --- */
+#btnResults, #btnDelTurner { padding: 0; }
+.canvas-nav .nav-btn svg { width: 12px; height: 12px; flex-shrink: 0; stroke: #333; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.canvas-nav .nav-btn-del svg { stroke: #c0392b; }
+.nav-sep { width: 1px; height: 14px; background: #ccc; margin: 0 1px; }
 </style>
 </head>
 <body>
 <div id="modal-overlay">
 <div class="modal-content">
-<h3 style="font-size:16px; border:none; margin-bottom:10px;">Nieuwe Wedstrijd</h3>
-<input type="text" id="new-comp-name" placeholder="Naam wedstrijd">
+<h3 style="font-size:16px; border:none; margin-bottom:10px;" data-i18n="new_comp_title">Nieuwe Wedstrijd</h3>
+<input type="text" id="new-comp-name" placeholder="Naam wedstrijd" data-i18n-placeholder="new_comp_placeholder">
 <select id="new-comp-type" class="input-standard">
 <option value="FIG">FIG </option>
 <option value="NTS 1">NTS 1 </option>
@@ -451,11 +492,41 @@ input[type="range"] { cursor: pointer; accent-color: #1a73e8; width: 50px; heigh
 <option value="Middenbouw">Middenbouw</option>
 <option value="Mix">Mix</option>
 </select>
-<button class="btn-main" onclick="bevestigNieuweWedstrijd()">Starten</button>
-<button class="btn-reset" onclick="sluitModal()" style="background:#95a5a6;">Annuleren</button>
+<button class="btn-main" onclick="bevestigNieuweWedstrijd()" data-i18n="btn_start">Starten</button>
+<button class="btn-reset" onclick="sluitModal()" style="background:#95a5a6;" data-i18n="btn_cancel">Annuleren</button>
 </div>
 </div>
+
+<div id="results-overlay" onclick="if (event.target === this) sluitUitslag()">
+  <div class="results-panel" role="dialog" aria-modal="true" aria-labelledby="results-title">
+    <div class="results-header">
+      <h3 id="results-title">Uitslag</h3>
+      <button type="button" class="results-close" onclick="sluitUitslag()" data-i18n-title="close">✕</button>
+    </div>
+    <div class="results-controls">
+      <label><span data-i18n="filter_apparatus">Toestel</span> <select id="results-filter-app" onchange="renderUitslag()"></select></label>
+      <label id="results-level-wrap"><span data-i18n="filter_level">Niveau</span> <select id="results-filter-level" onchange="renderUitslag()"></select></label>
+      <label><span data-i18n="sort_label">Sorteren</span>
+        <select id="results-sort" onchange="renderUitslag()">
+          <option value="score" data-i18n="sort_score">Eindcijfer (hoog → laag)</option>
+          <option value="order" data-i18n="sort_order">Volgorde van invoer</option>
+          <option value="name" data-i18n="sort_name_az">Naam (A-Z)</option>
+        </select>
+      </label>
+    </div>
+    <div class="results-body"><table class="results-table"><thead><tr id="results-head"></tr></thead><tbody id="results-tbody"></tbody></table></div>
+    <div class="results-note" id="results-note"></div>
+  </div>
+</div>
+
+<div id="update-banner" role="status" hidden>
+  <span data-i18n="update_available">Er is een nieuwe versie van de app.</span>
+  <button type="button" class="update-go" onclick="installUpdate()" data-i18n="update_btn">Bijwerken</button>
+  <button type="button" class="update-dismiss" onclick="document.getElementById('update-banner').hidden = true" data-i18n-title="close">✕</button>
+</div>
+
 <div id="dashboard">
+<div class="dashboard-inner">
 <img src="thlogo.jpg" id="dashboard-logo" alt="Logo">
 
 <button class="btn-main" id="btn-full-screen" onclick="toggleFullScreen()" 
@@ -469,16 +540,30 @@ style="background: #2c3e50;
 	font-size: 14px; 
 	width: auto; 
 	min-width: 150px;
-    ">⛶ Volledig Scherm</button>
+    " data-i18n="fullscreenBtn">⛶ Volledig scherm</button>
 
-<div class="btn-settings-icon" onclick="toggleSettings()" title="Layout Instellingen">⚙</div>
+<div class="btn-settings-icon" onclick="toggleSettings()" title="Instellingen" data-i18n-title="settingsTitle">⚙</div>
 <h1 style="text-align:center">TH TurnScore Pro</h1>
 <div class="card">
-<button class="btn-main" id="btn-new-competition" onclick="openModal()">+ Nieuwe Wedstrijd Starten</button>
+<button class="btn-main" id="btn-new-competition" onclick="openModal()" data-i18n="newComp">+ Nieuwe Wedstrijd Starten</button>
+</div>
+<div class="card backup-card">
+<div class="backup-row">
+  <div class="backup-text">
+    <strong data-i18n="backup_title">Backup</strong>
+    <small id="backup-status"></small>
+  </div>
+  <div class="backup-buttons">
+    <button type="button" class="btn-backup" onclick="exportBackup()" data-i18n="backup_export">💾 Backup maken</button>
+    <button type="button" class="btn-backup btn-backup-secondary" onclick="document.getElementById('backup-file-input').click()" data-i18n="backup_import">📂 Backup terugzetten</button>
+    <input type="file" id="backup-file-input" accept=".json,application/json" hidden onchange="importBackup(this)">
+  </div>
+</div>
+<p class="backup-info" data-i18n="backup_info">Alle wedstrijden staan alleen op dit apparaat.</p>
 </div>
 <div id="settings-panel" class="card">
 <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 1px solid #eee; margin-bottom:10px;">
-<h3 style="border:none; margin:0;" id="settings-title">Instellingen</h3>
+<h3 style="border:none; margin:0;" id="settings-title" data-i18n="settingsTitle">Instellingen</h3>
 <button onclick="toggleSettings()" style="background:none; border:none; cursor:pointer; font-weight:bold;">X</button>
 </div>
 <div class="settings-note" data-i18n="settings_note">
@@ -492,36 +577,36 @@ De instellingen worden toegepast bij nieuwe wedstrijden en niet op bestaande wed
 </select>
 </div>
 <div class="setting-row">
-    <label id="lbl-turner-info-canvas">Canvas naam/land tonen:</label>
+    <label id="lbl-turner-info-canvas" data-i18n="turner_info_canvas">Canvas naam/land tonen:</label>
     <select id="set-show-turner-info-canvas" onchange="saveVisibilitySettings()" style="width: 120px !important;">
-        <option value="no">Nee</option>
-        <option value="yes">Ja</option>
+        <option value="no" data-i18n="opt_no">Nee</option>
+        <option value="yes" data-i18n="opt_yes">Ja</option>
     </select>
 </div>
 <div class="setting-row">
-    <label for="set-show-timer">Timer zichtbaar:</label>
+    <label for="set-show-timer" data-i18n="show_timer">Timer zichtbaar:</label>
     <select id="set-show-timer" onchange="saveVisibilitySettings()" style="width: 120px !important;">
-        <option value="yes">Ja</option>
-        <option value="no">Nee</option>
+        <option value="yes" data-i18n="opt_yes">Ja</option>
+        <option value="no" data-i18n="opt_no">Nee</option>
     </select>
 </div>
 
 <div class="setting-row">
-<label id="lbl-bonus-calc">Bonus Berekening:</label>
+<label id="lbl-bonus-calc" data-i18n="bonus_calc">Bonus Berekening:</label>
 <select id="set-bonus-mode" onchange="saveVisibilitySettings()" style="width: 120px !important;">
-<option value="auto">Automatisch</option>
-<option value="manual">Handmatig</option>
+<option value="auto" data-i18n="opt_auto">Automatisch</option>
+<option value="manual" data-i18n="opt_manual">Handmatig</option>
 </select>
 </div>
 <div class="setting-row">
-<label id="lbl-value-select-mode">Waardes selecteren:</label>
+<label id="lbl-value-select-mode" data-i18n="value_select_mode">Waardes selecteren:</label>
 <select id="set-value-select-mode" onchange="saveVisibilitySettings()" style="width: 120px !important;">
-<option value="selecteren">Selecteren</option>
-<option value="dropdown">Dropdown</option>
+<option value="selecteren" data-i18n="opt_select">Selecteren</option>
+<option value="dropdown" data-i18n="opt_dropdown">Dropdown</option>
 </select>
 </div>
 <div class="setting-row">
-<label id="lbl-group-preset">Preset groepen:</label>
+<label id="lbl-group-preset" data-i18n="group_preset">Preset groepen:</label>
 <select id="set-group-preset" onchange="saveVisibilitySettings()" style="width: 120px !important;">
 <option value="0.0">0.0</option>
 <option value="0.3">0.3</option>
@@ -539,7 +624,7 @@ De instellingen worden toegepast bij nieuwe wedstrijden en niet op bestaande wed
 <div class="checkbox-item"><input type="checkbox" id="show-J" checked onchange="updateBlancoOptions(); saveVisibilitySettings()"> <label>J</label></div>
 </div>
 <div class="setting-row">
-    <label id="lbl-blanco">Extra Blanco Velden:</label>
+    <label id="lbl-blanco" data-i18n="extra_blanco">Extra Blanco Velden:</label>
     <select id="set-blanco-count" onchange="saveVisibilitySettings()" style="width: 80px;">
         <option value="0">0</option>
         <option value="1">1</option>
@@ -551,38 +636,40 @@ De instellingen worden toegepast bij nieuwe wedstrijden en niet op bestaande wed
     </select>
 </div>
 <div class="setting-row">
-    <label id="lbl-gym-w">Breedte Gymnast (px):</label>
+    <label id="lbl-gym-w" data-i18n="width_gym">Breedte Gymnast (px):</label>
     <input type="number" id="set-canvas-w" value="200" onchange="saveVisibilitySettings()">
 </div>
 <div class="setting-row">
-    <label id="lbl-turner-info-canvas-w">Breedte Naam/Land (px):</label>
+    <label id="lbl-turner-info-canvas-w" data-i18n="turner_info_canvas_w">Breedte Naam/Land (px):</label>
     <input type="number" id="set-turner-info-canvas-w" value="200" onchange="saveVisibilitySettings()">
 </div>
 <div class="setting-row">
-    <label id="lbl-gym-h">Hoogte Gymnast (px):</label>
+    <label id="lbl-gym-h" data-i18n="height_gym">Hoogte Gymnast (px):</label>
     <input type="number" id="set-canvas-h" value="75" onchange="saveVisibilitySettings()">
 </div>
 
 <div class="setting-row">
-<label id="lbl-sidebar-w">Breedte Sidebar (px):</label>
+<label id="lbl-sidebar-w" data-i18n="sidebarW">Breedte Sidebar (px):</label>
 <input type="number" id="set-sidebar-w" value="160" onchange="updateLayoutSettings()">
 </div>
 <div class="setting-row">
-<label id="lbl-topbar-h">Hoogte Topbar (px):</label>
+<label id="lbl-topbar-h" data-i18n="topbarH">Hoogte Topbar (px):</label>
 <input type="number" id="set-topbar-h" value="115" onchange="updateLayoutSettings()">
 </div>
-<button class="btn-reset" id="btn-reset-settings" onclick="resetSettings()">Reset naar Standaard</button>
+<button class="btn-reset" id="btn-reset-settings" onclick="resetSettings()" data-i18n="resetBtn">Reset naar Standaard</button>
+<div class="app-info" id="app-info"></div>
 </div>
 <div class="card">
 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-<h3 id="my-competitions-title" style="margin:0; font-size:16px; border:none;">Mijn Wedstrijden</h3>
+<h3 id="my-competitions-title" style="margin:0; font-size:16px; border:none;" data-i18n="myComp">Mijn Wedstrijden</h3>
 <select id="sort-order" onchange="laadOverzicht()" style="width: 120px; height: 24px; font-size: 11px;">
-<option value="new">Datum (Nieuw)</option>
-<option value="old">Datum (Oud)</option>
-<option value="name">Naam (A-Z)</option>
+<option value="new" data-i18n="sort_date_new">Datum (Nieuw)</option>
+<option value="old" data-i18n="sort_date_old">Datum (Oud)</option>
+<option value="name" data-i18n="sort_name">Naam (A-Z)</option>
 </select>
 </div>
 <div id="wedstrijd-lijst"></div>
+</div>
 </div>
 </div>
 <div id="app-interface">
@@ -622,7 +709,7 @@ De instellingen worden toegepast bij nieuwe wedstrijden en niet op bestaande wed
 <canvas id="turnerInfoCanvas" width="200" height="75"></canvas>
 </div>
 <div class="apparatus-container" style="display:flex; flex-direction:column; align-items:center; margin: 0 10px;">
-    <label style="font-size: 11px; font-weight: bold; text-transform: uppercase; margin-bottom: 4px;">Toestel</label>
+    <label style="font-size: 11px; font-weight: bold; text-transform: uppercase; margin-bottom: 4px;" data-i18n="apparatus_label">Toestel</label>
     <select id="apparatus-select" class="input-standard" style="width: 60px; background: white;" onchange="updateApparatusImage(); rekenen();">
         <option value="FX">FX</option>
         <option value="PH">PH</option>
@@ -634,7 +721,7 @@ De instellingen worden toegepast bij nieuwe wedstrijden en niet op bestaande wed
     <img id="apparatus-display-img" src="" style="display:none; width: 40px; height: 40px; margin-top: 5px; object-fit: contain;">
 </div>
 <div class="level-container" id="mix-level-container" style="display:none; flex-direction:column; align-items:center; margin: 0 10px;">
-    <label style="font-size: 11px; font-weight: bold; text-transform: uppercase; margin-bottom: 4px;">Niveau</label>
+    <label style="font-size: 11px; font-weight: bold; text-transform: uppercase; margin-bottom: 4px;" data-i18n="level_label">Niveau</label>
     <select id="mix-level-select" class="input-standard" style="width: 95px; background: white;" onchange="updateApparatusImage(); rekenen();">
         <option value="FIG">FIG</option>
         <option value="NTS 1">NTS 1</option>
@@ -649,7 +736,7 @@ De instellingen worden toegepast bij nieuwe wedstrijden en niet op bestaande wed
 <div class="e-panel-section">
 <div class="jury-label-stack" id="std-jury-stack">
     <div style="text-align: center;">
-        <label style="font-size: 9px; display: block;">JURY</label>
+        <label style="font-size: 9px; display: block;" data-i18n="jury">JURY</label>
         <select id="juryCount" class="input-standard" style="width:45px;" onchange="buildEInputs()">
             <option value="1">1</option>
             <option value="2" selected>2</option>
@@ -708,18 +795,21 @@ De instellingen worden toegepast bij nieuwe wedstrijden en niet op bestaande wed
 <button class="nav-btn" onclick="goPrevious()" id="btnPrev"> &lsaquo; </button>
 <span id="page-info" style="font-size:9px; min-width:25px; text-align:center;">1/1</span>
 <button class="nav-btn" onclick="goNext()" id="btnNext"> &rsaquo; </button>
+<div class="nav-sep"></div>
+<button class="nav-btn" onclick="openUitslag(huidigeWedstrijdId)" id="btnResults" title="Uitslag" data-i18n-title="results_title_btn"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"></path></svg></button>
+<button class="nav-btn nav-btn-del" onclick="verwijderHuidigeTurner()" id="btnDelTurner" title="Deze turner verwijderen" data-i18n-title="delete_turner_title"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"></path></svg></button>
 </div>
 </div>
 
 <div class="sidebar">
-<h3>D-SCORE</h3>
+<h3 data-i18n="dscore_header">D-SCORE</h3>
 <div class="sidebar-fullscreen-wrap">
 <button 
 	type="button" 
 	class="btn-sidebar-fullscreen" 
 	onclick="toggleFullScreen()" 
 	title="Volledig scherm" 
-	aria-label="Volledig scherm">⛶</button>
+	aria-label="Volledig scherm" data-i18n-title="fullscreen_title">⛶</button>
 </div>
 
 <div id="standard-sidebar-content">
@@ -788,9 +878,9 @@ De instellingen worden toegepast bij nieuwe wedstrijden en niet op bestaande wed
 
 <div id="vt-sidebar-content" class="vt-hidden">
     <div class="vt-sidebar-box">
-        <h4>Sprong 1</h4>
+        <h4 data-i18n="vault1">Sprong 1</h4>
         <div style="display:flex; justify-content:center; align-items:center; gap:5px; margin-bottom:5px;">
-            <label style="font-size:11px; font-weight:bold; width:55px; text-align:right;">Nr:</label>
+            <label style="font-size:11px; font-weight:bold; width:55px; text-align:right;" data-i18n="nr_label">Nr:</label>
             <input type="text" id="vt-nummer1" class="input-standard" style="width:60px; font-weight:bold;" value="0" readonly onclick="openFloatingKeyboard(this)">
         </div>
         <div style="display:flex; justify-content:center; align-items:center; gap:5px; margin-bottom:5px;">
@@ -804,9 +894,9 @@ De instellingen worden toegepast bij nieuwe wedstrijden en niet op bestaande wed
     </div>
     
     <div class="vt-sidebar-box">
-        <h4>Sprong 2</h4>
+        <h4 data-i18n="vault2">Sprong 2</h4>
         <div style="display:flex; justify-content:center; align-items:center; gap:5px; margin-bottom:5px;">
-            <label style="font-size:11px; font-weight:bold; width:55px; text-align:right;">Nr:</label>
+            <label style="font-size:11px; font-weight:bold; width:55px; text-align:right;" data-i18n="nr_label">Nr:</label>
             <input type="text" id="vt-nummer2" class="input-standard" style="width:60px; font-weight:bold;" value="0" readonly onclick="openFloatingKeyboard(this)">
         </div>
         <div style="display:flex; justify-content:center; align-items:center; gap:5px; margin-bottom:5px;">
@@ -840,7 +930,7 @@ De instellingen worden toegepast bij nieuwe wedstrijden en niet op bestaande wed
     </div>
     <div class="keyboard-actions">
         <button onclick="nextField()" class="btn-ok">OK</button>
-        <button onclick="closeKeyboard()" class="btn-close">Sluiten</button>
+        <button onclick="closeKeyboard()" class="btn-close" data-i18n="kb_close">Sluiten</button>
     </div>
 </div>
 <script>
@@ -848,6 +938,10 @@ De instellingen worden toegepast bij nieuwe wedstrijden en niet op bestaande wed
 if ('virtualKeyboard' in navigator) {
     navigator.virtualKeyboard.overlaysContent = true;
 }
+
+// Versienummer van de app. Verhoog dit bij elke nieuwe versie die je uploadt:
+// dan halen alle apparaten bij de volgende start alle bestanden opnieuw op.
+const APP_VERSION = '2.1.0';
 
 let huidigeWedstrijdId = null;
 let database = [];
@@ -873,52 +967,126 @@ const values = {J:1.0, I:0.9, H:0.8, G:0.7, F:0.6, E:0.5, D:0.4, C:0.3, B:0.2, A
 const DB_NAME = 'TurnScoreDB';
 const STORE_NAME = 'wedstrijdData';
 
+// Eén gedeelde verbinding i.p.v. bij elke opslag een nieuwe openen.
+let dbPromise = null;
 function initDB() {
-    return new Promise((resolve, reject) => {
-        const request = indexedDB.open(DB_NAME, 1);
-        request.onupgradeneeded = (e) => {
-            e.target.result.createObjectStore(STORE_NAME);
-        };
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-    });
+    if (!dbPromise) {
+        dbPromise = new Promise((resolve, reject) => {
+            const request = indexedDB.open(DB_NAME, 1);
+            request.onupgradeneeded = (e) => {
+                e.target.result.createObjectStore(STORE_NAME);
+            };
+            request.onsuccess = () => {
+                const db = request.result;
+                db.onversionchange = () => { db.close(); dbPromise = null; };
+                db.onclose = () => { dbPromise = null; };
+                resolve(db);
+            };
+            request.onerror = () => { dbPromise = null; reject(request.error); };
+        });
+    }
+    return dbPromise;
+}
+
+async function idbRequest(mode, operation) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+            const db = await initDB();
+            return await new Promise((resolve, reject) => {
+                const tx = db.transaction(STORE_NAME, mode);
+                const request = operation(tx.objectStore(STORE_NAME));
+                let result;
+                if (request) request.onsuccess = () => { result = request.result; };
+                tx.oncomplete = () => resolve(result);
+                tx.onerror = () => reject(tx.error);
+                tx.onabort = () => reject(tx.error || new Error('Transaction aborted'));
+            });
+        } catch (err) {
+            // Verbinding was gesloten (bijv. na wissen van opslag): één keer opnieuw proberen.
+            if (attempt === 0 && err && err.name === 'InvalidStateError') { dbPromise = null; continue; }
+            throw err;
+        }
+    }
 }
 
 async function saveToDB(key, value) {
-    const db = await initDB();
-    return new Promise((resolve, reject) => {
-        const tx = db.transaction(STORE_NAME, 'readwrite');
-        tx.objectStore(STORE_NAME).put(value, key);
-        tx.oncomplete = () => resolve();
-        tx.onerror = () => reject(tx.error);
-    });
+    return idbRequest('readwrite', store => store.put(value, key));
 }
 
 async function loadFromDB(key) {
-    const db = await initDB();
-    return new Promise((resolve, reject) => {
-        const tx = db.transaction(STORE_NAME, 'readonly');
-        const request = tx.objectStore(STORE_NAME).get(key);
-        request.onsuccess = () => resolve(request.result || []);
-        request.onerror = () => reject(request.error);
-    });
+    await flushPendingWrites(); // eerst openstaande wijzigingen wegschrijven, anders lees je oude gegevens
+    const result = await idbRequest('readonly', store => store.get(key));
+    return result || [];
 }
 
 async function deleteFromDB(key) {
-    const db = await initDB();
-    return new Promise((resolve, reject) => {
-        const tx = db.transaction(STORE_NAME, 'readwrite');
-        tx.objectStore(STORE_NAME).delete(key);
-        tx.oncomplete = () => resolve();
-        tx.onerror = () => reject(tx.error);
-    });
+    pendingWrites.delete(key);
+    return idbRequest('readwrite', store => store.delete(key));
+}
+
+// Opslaan: direct wegschrijven, maar nooit meerdere keren tegelijk. Komen er tijdens het
+// schrijven nieuwe wijzigingen bij, dan wordt daarna alleen de nieuwste versie geschreven.
+const pendingWrites = new Map();
+let writeLoop = null;
+let saveErrorShown = false;
+function scheduleDBWrite(id, data) {
+    if (!id) return;
+    pendingWrites.set(id, data);
+    if (!writeLoop) writeLoop = Promise.resolve().then(drainPendingWrites);
+}
+async function drainPendingWrites() {
+    try {
+        while (pendingWrites.size > 0) {
+            const entries = Array.from(pendingWrites.entries());
+            pendingWrites.clear();
+            await Promise.all(entries.map(([id, data]) => saveToDB(id, data).catch(err => {
+                console.error('Opslaan mislukt', err);
+                if (!saveErrorShown) { saveErrorShown = true; alert(t('save_failed') + (err && err.message ? err.message : err)); }
+            })));
+        }
+    } finally {
+        writeLoop = null;
+    }
+}
+// Wacht tot alles wat nog moet worden opgeslagen echt in de database staat.
+async function flushPendingWrites() {
+    if (!writeLoop && pendingWrites.size > 0) writeLoop = Promise.resolve().then(drainPendingWrites);
+    if (writeLoop) await writeLoop;
+}
+function saveAndFlushNow() {
+    if (huidigeWedstrijdId) saveCurrent();
+    return flushPendingWrites();
+}
+document.addEventListener('visibilitychange', () => { if (document.hidden) saveAndFlushNow(); });
+window.addEventListener('pagehide', () => { saveAndFlushNow(); });
+
+// Vraag de browser om de gegevens niet op te ruimen bij weinig opslagruimte.
+let storagePersisted = null;
+async function requestPersistentStorage() {
+    try {
+        if (navigator.storage && navigator.storage.persist) {
+            storagePersisted = (await navigator.storage.persisted()) || (await navigator.storage.persist());
+        }
+    } catch (e) { /* niet ondersteund */ }
+    updateAppInfo();
+}
+
+function getLijst() {
+    try { const l = JSON.parse(localStorage.getItem('ts_lijst') || '[]'); return Array.isArray(l) ? l : []; }
+    catch (e) { return []; }
+}
+function setLijst(lijst) { localStorage.setItem('ts_lijst', JSON.stringify(lijst)); }
+
+// Maakt een veilige bestandsnaam (geen / \ : * ? " < > |).
+function safeFileName(name) {
+    return String(name || 'TurnScore').replace(/[\\/:*?"<>|]+/g, '_').trim() || 'TurnScore';
 }
 
 async function exportWedstrijdPDF(id, naam) {
     const backupId = huidigeWedstrijdId;
     const backupIndex = currentIndex;
     const data = await loadFromDB(id);
-    if (data.length === 0) { alert("Geen gegevens om te exporteren."); return; }
+    if (data.length === 0) { alert(t('alert_no_data')); return; }
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ orientation: 'l', unit: 'mm', format: 'a4' });
     const target = document.getElementById('app-interface');
@@ -945,7 +1113,7 @@ async function exportWedstrijdPDF(id, naam) {
         const imgHeight = Math.min(canvas.height * ratio, doc.internal.pageSize.getHeight());
         doc.addImage(imgData, 'PNG', 0, 0, pdfWidth, imgHeight);
     }
-    doc.save(`${naam}_Rapport.pdf`);
+    doc.save(`${safeFileName(naam)}_${t('file_report')}.pdf`);
     if(toolbar) toolbar.style.display = 'flex';
     if (dashboardWasOpen) { dashboard.style.display = 'block'; target.style.display = 'none'; }
     huidigeWedstrijdId = backupId;
@@ -1000,11 +1168,14 @@ const translations = {
         settingsTitle: "Instellingen",
         sidebarW: "Breedte Sidebar (px):",
         topbarH: "Hoogte Topbar (px):",
-	fullscreenBtn: "Volledig scherm",
+        fullscreenBtn: "⛶ Volledig scherm",
+        fullscreen_title: "Volledig scherm",
+        fullscreen_error: "Fout bij activeren volledig scherm: ",
         resetBtn: "Reset naar Standaard",
         myComp: "Mijn Wedstrijden",
+        no_competitions: "Nog geen wedstrijden. Start hierboven een nieuwe wedstrijd.",
         gymnast: "Gymnast",
-        jury: "Jury",
+        jury: "JURY",
         avg_e: "AVG E",
         neutral: "N",
         final: "Eindcijfer",
@@ -1012,6 +1183,7 @@ const translations = {
         groups: "Σ Groepen",
         stick: "Stick",
         apparatus_label: "Toestel",
+        level_label: "Niveau",
         dscore_header: "D-SCORE",
         extra_blanco: "Extra Blanco Velden:",
         width_gym: "Breedte Gymnast (px):",
@@ -1019,24 +1191,115 @@ const translations = {
         turner_info: "Naam / Land",
         turner_info_canvas: "Canvas naam/land tonen:",
         turner_info_canvas_w: "Breedte Naam/Land (px):",
+        show_timer: "Timer zichtbaar:",
+        bonus_calc: "Bonus Berekening:",
+        opt_yes: "Ja",
+        opt_no: "Nee",
+        opt_auto: "Automatisch",
+        opt_manual: "Handmatig",
+        opt_select: "Selecteren",
+        opt_dropdown: "Dropdown",
         sort_date_new: "Datum (Nieuw)",
         sort_date_old: "Datum (Oud)",
         sort_name: "Naam (A-Z)",
-	visible_el: "Zichtbare Elementen (E-J):",
-	settings_note: "De instellingen worden toegepast bij nieuwe wedstrijden en niet op bestaande wedstrijden.",
+        visible_el: "Zichtbare Elementen (E-J):",
+        settings_note: "De instellingen worden toegepast bij nieuwe wedstrijden en niet op bestaande wedstrijden.",
         value_select_mode: "Waardes selecteren:",
         group_preset: "Preset groepen:",
+        new_comp_title: "Nieuwe Wedstrijd",
+        new_comp_placeholder: "Naam wedstrijd",
+        btn_start: "Starten",
+        btn_cancel: "Annuleren",
+        btn_results: "UITSLAG",
+        btn_edit: "EDIT",
+        btn_pdf: "PDF",
+        btn_excel: "EXCEL",
+        btn_delete: "WIS",
+        bonus_header: "Bonus",
+        mb_my_e: "MIJN E-AFTREK",
+        mb_my_final: "MIJN EIND",
+        mb_extra_jury: "EXTRA JURY",
+        mb_final_j2: "EIND J2",
+        mb_final_j3: "EIND J3",
+        vault1: "Sprong 1",
+        vault2: "Sprong 2",
+        nr_label: "Nr:",
+        kb_close: "Sluiten",
+        close: "Sluiten",
+        alert_enter_name: "Vul een naam in",
+        alert_no_data: "Geen gegevens om te exporteren.",
+        prompt_new_name: "Nieuwe naam:",
+        confirm_delete_comp: "Wedstrijd \"{naam}\" verwijderen?\n\nAlle turners en scores van deze wedstrijd worden gewist. Dit kan niet ongedaan worden gemaakt.",
+        save_failed: "Opslaan is mislukt. Mogelijk is de opslag van het apparaat vol. Maak zo snel mogelijk een backup.\n\nFoutmelding: ",
+        delete_turner_title: "Deze turner verwijderen",
+        confirm_delete_turner: "Turner {n} van {total} verwijderen?\n\nDit kan niet ongedaan worden gemaakt.",
+        results_title_btn: "Uitslag",
+        version_label: "Versie",
+        storage_persisted: "opslag vastgezet op dit apparaat",
+        storage_not_persisted: "opslag niet vastgezet: maak regelmatig een backup",
+        backup_title: "Backup",
+        backup_export: "💾 Backup maken",
+        backup_import: "📂 Backup terugzetten",
+        backup_info: "Alle wedstrijden staan alleen op dit apparaat. Maak na elke wedstrijd een backup en bewaar het bestand ook ergens anders (bijvoorbeeld in Google Drive of je e-mail).",
+        backup_last: "Laatste backup: {d}",
+        backup_never: "Nog geen backup gemaakt",
+        backup_empty: "Er zijn nog geen wedstrijden om te backuppen.",
+        backup_failed: "Backup maken is mislukt: ",
+        backup_invalid: "Dit is geen geldig TH TurnScore Pro-backupbestand.",
+        backup_conflict: "{n} wedstrijd(en) uit de backup staan al op dit apparaat.\n\nOK = vervangen door de versie uit de backup\nAnnuleren = deze overslaan",
+        backup_restored: "{n} wedstrijd(en) teruggezet, {s} overgeslagen.",
+        backup_restore_failed: "Backup terugzetten is mislukt: ",
+        update_available: "Er is een nieuwe versie van de app.",
+        update_btn: "Bijwerken",
+        results_heading: "Uitslag",
+        filter_apparatus: "Toestel",
+        filter_level: "Niveau",
+        filter_all: "Alle",
+        sort_label: "Sorteren",
+        sort_score: "Eindcijfer (hoog → laag)",
+        sort_order: "Volgorde van invoer",
+        sort_name_az: "Naam (A-Z)",
+        col_rank: "#",
+        col_name: "Naam",
+        col_apparatus: "Toestel",
+        col_level: "Niveau",
+        col_d: "D",
+        col_e: "E-aftrek",
+        col_final: "Eindcijfer",
+        col_page: "Pagina",
+        name_placeholder: "Naam (optioneel)",
+        open_page_title: "Pagina {n} openen",
+        results_none: "Nog geen turners met een score in deze wedstrijd.",
+        results_hidden_empty: "{n} lege pagina('s) niet getoond.",
+        results_vault_note: "Sprong: gerangschikt op sprong 1.",
+        results_rank_note: "Plaatsen gelden per toestel en niveau.",
+        app_FX: "Vloer", app_PH: "Voltige", app_SR: "Ringen", app_VT: "Sprong", app_PB: "Brug", app_HB: "Rek",
+        xl_sheet: "Resultaten",
+        xl_gymnast: "Gymnast",
+        xl_name: "Naam",
+        xl_turner_info: "Naam/Land",
+        xl_apparatus: "Toestel",
+        xl_level: "Niveau",
+        xl_sum_elem: "Σ Elementen",
+        xl_sum_groups: "Σ Groepen",
+        xl_e_ded: "E-Aftrek",
+        xl_final: "Eindcijfer",
+        file_report: "Rapport",
+        file_export: "Export",
     },
     en: {
         newComp: "+ Start New Competition",
         settingsTitle: "Settings",
         sidebarW: "Sidebar Width (px):",
         topbarH: "Topbar Height (px):",
-	fullscreenBtn: "Full screen",
+        fullscreenBtn: "⛶ Full screen",
+        fullscreen_title: "Full screen",
+        fullscreen_error: "Could not switch to full screen: ",
         resetBtn: "Reset to Default",
         myComp: "My Competitions",
+        no_competitions: "No competitions yet. Start a new competition above.",
         gymnast: "Gymnast",
-        jury: "Judges",
+        jury: "JUDGES",
         avg_e: "AVG E",
         neutral: "ND",
         final: "Final Score",
@@ -1044,6 +1307,7 @@ const translations = {
         groups: "Σ Groups",
         stick: "Stick",
         apparatus_label: "Apparatus",
+        level_label: "Level",
         dscore_header: "D-SCORE",
         extra_blanco: "Extra Blank Fields:",
         width_gym: "Gymnast Width (px):",
@@ -1051,68 +1315,165 @@ const translations = {
         turner_info: "Name / Country",
         turner_info_canvas: "Show name/country canvas:",
         turner_info_canvas_w: "Name/Country Width (px):",
+        show_timer: "Show timer:",
+        bonus_calc: "Bonus calculation:",
+        opt_yes: "Yes",
+        opt_no: "No",
+        opt_auto: "Automatic",
+        opt_manual: "Manual",
+        opt_select: "Buttons",
+        opt_dropdown: "Dropdown",
         sort_date_new: "Date (New)",
         sort_date_old: "Date (Old)",
         sort_name: "Name (A-Z)",
-	visible_el: "Visible Elements (E-J):",
-	settings_note: "These settings apply to new competitions and not to existing competitions.",
+        visible_el: "Visible Elements (E-J):",
+        settings_note: "These settings apply to new competitions and not to existing competitions.",
         value_select_mode: "Select values:",
         group_preset: "Group preset:",
+        new_comp_title: "New Competition",
+        new_comp_placeholder: "Competition name",
+        btn_start: "Start",
+        btn_cancel: "Cancel",
+        btn_results: "RESULTS",
+        btn_edit: "EDIT",
+        btn_pdf: "PDF",
+        btn_excel: "EXCEL",
+        btn_delete: "DELETE",
+        bonus_header: "Bonus",
+        mb_my_e: "MY E-DEDUCTION",
+        mb_my_final: "MY FINAL",
+        mb_extra_jury: "EXTRA JUDGES",
+        mb_final_j2: "FINAL J2",
+        mb_final_j3: "FINAL J3",
+        vault1: "Vault 1",
+        vault2: "Vault 2",
+        nr_label: "No.:",
+        kb_close: "Close",
+        close: "Close",
+        alert_enter_name: "Please enter a name",
+        alert_no_data: "No data to export.",
+        prompt_new_name: "New name:",
+        confirm_delete_comp: "Delete competition \"{naam}\"?\n\nAll gymnasts and scores of this competition will be removed. This cannot be undone.",
+        save_failed: "Saving failed. The device storage may be full. Please make a backup as soon as possible.\n\nError: ",
+        delete_turner_title: "Delete this gymnast",
+        confirm_delete_turner: "Delete gymnast {n} of {total}?\n\nThis cannot be undone.",
+        results_title_btn: "Results",
+        version_label: "Version",
+        storage_persisted: "storage locked on this device",
+        storage_not_persisted: "storage not locked: make regular backups",
+        backup_title: "Backup",
+        backup_export: "💾 Create backup",
+        backup_import: "📂 Restore backup",
+        backup_info: "All competitions are stored on this device only. Make a backup after every competition and keep the file somewhere else as well (for example Google Drive or your e-mail).",
+        backup_last: "Last backup: {d}",
+        backup_never: "No backup made yet",
+        backup_empty: "There are no competitions to back up yet.",
+        backup_failed: "Creating the backup failed: ",
+        backup_invalid: "This is not a valid TH TurnScore Pro backup file.",
+        backup_conflict: "{n} competition(s) from the backup already exist on this device.\n\nOK = replace them with the version from the backup\nCancel = skip them",
+        backup_restored: "{n} competition(s) restored, {s} skipped.",
+        backup_restore_failed: "Restoring the backup failed: ",
+        update_available: "A new version of the app is available.",
+        update_btn: "Update",
+        results_heading: "Results",
+        filter_apparatus: "Apparatus",
+        filter_level: "Level",
+        filter_all: "All",
+        sort_label: "Sort",
+        sort_score: "Final score (high → low)",
+        sort_order: "Entry order",
+        sort_name_az: "Name (A-Z)",
+        col_rank: "#",
+        col_name: "Name",
+        col_apparatus: "App.",
+        col_level: "Level",
+        col_d: "D",
+        col_e: "E-ded.",
+        col_final: "Final",
+        col_page: "Page",
+        name_placeholder: "Name (optional)",
+        open_page_title: "Open page {n}",
+        results_none: "No gymnasts with a score in this competition yet.",
+        results_hidden_empty: "{n} empty page(s) hidden.",
+        results_vault_note: "Vault: ranked by vault 1.",
+        results_rank_note: "Ranks are per apparatus and level.",
+        app_FX: "Floor", app_PH: "Pommel horse", app_SR: "Rings", app_VT: "Vault", app_PB: "Parallel bars", app_HB: "High bar",
+        xl_sheet: "Results",
+        xl_gymnast: "Gymnast",
+        xl_name: "Name",
+        xl_turner_info: "Name/Country",
+        xl_apparatus: "Apparatus",
+        xl_level: "Level",
+        xl_sum_elem: "Σ Elements",
+        xl_sum_groups: "Σ Groups",
+        xl_e_ded: "E-Deduction",
+        xl_final: "Final Score",
+        file_report: "Report",
+        file_export: "Export",
     }
 };
+
+let currentLang = 'nl';
+// Vertaal een sleutel; {naam} in de tekst wordt vervangen door vars.naam enz.
+function t(key, vars) {
+    const dict = translations[currentLang] || translations.nl;
+    let text = (key in dict) ? dict[key] : (key in translations.nl ? translations.nl[key] : key);
+    if (vars) Object.keys(vars).forEach(k => { text = text.split('{' + k + '}').join(String(vars[k])); });
+    return text;
+}
+function applyTranslations(root = document) {
+    root.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.getAttribute('data-i18n')); });
+    root.querySelectorAll('[data-i18n-placeholder]').forEach(el => { el.placeholder = t(el.getAttribute('data-i18n-placeholder')); });
+    root.querySelectorAll('[data-i18n-title]').forEach(el => {
+        const text = t(el.getAttribute('data-i18n-title'));
+        el.title = text;
+        el.setAttribute('aria-label', text);
+    });
+}
+function changeLanguage() {
+    const select = document.getElementById('set-lang');
+    currentLang = translations[select.value] ? select.value : 'nl';
+    document.documentElement.lang = currentLang;
+    try { localStorage.setItem('ts_lang', currentLang); } catch (e) {}
+    applyTranslations();
+    refreshChoiceWidgets();
+    updateAppInfo();
+    laadOverzicht();
+    if (document.getElementById('results-overlay').style.display === 'flex') renderUitslag();
+}
+function updateAppInfo() {
+    const info = document.getElementById('app-info');
+    if (info) {
+        let text = `${t('version_label')} ${APP_VERSION}`;
+        if (storagePersisted === true) text += ' · ' + t('storage_persisted');
+        else if (storagePersisted === false) text += ' · ' + t('storage_not_persisted');
+        info.textContent = text;
+    }
+    const status = document.getElementById('backup-status');
+    if (status) {
+        let last = null;
+        try { last = localStorage.getItem('ts_last_backup'); } catch (e) {}
+        status.textContent = last
+            ? t('backup_last', { d: new Date(last).toLocaleString(currentLang === 'en' ? 'en-GB' : 'nl-NL', { dateStyle: 'medium', timeStyle: 'short' }) })
+            : t('backup_never');
+    }
+}
 
 function openModal() { document.getElementById('modal-overlay').style.display = 'flex'; }
 function sluitModal() { document.getElementById('modal-overlay').style.display = 'none'; }
 
 async function bevestigNieuweWedstrijd() {
-const naam = document.getElementById('new-comp-name').value;
+const naam = document.getElementById('new-comp-name').value.trim();
 const type = document.getElementById('new-comp-type').value;
-if(!naam) { alert("Vul een naam in"); return; }
+if(!naam) { alert(t('alert_enter_name')); return; }
+document.getElementById('new-comp-name').value = '';
 const id = 'W' + Date.now();
-const lijst = JSON.parse(localStorage.getItem('ts_lijst') || '[]');
+const lijst = getLijst();
 const frozenVisSettings = { E: document.getElementById('show-E').checked, F: document.getElementById('show-F').checked, G: document.getElementById('show-G').checked, H: document.getElementById('show-H').checked, I: document.getElementById('show-I').checked, J: document.getElementById('show-J').checked, blancoCount: parseInt(document.getElementById('set-blanco-count').value) || 0, canvasW: parseInt(document.getElementById('set-canvas-w').value) || 200, canvasH: parseInt(document.getElementById('set-canvas-h').value) || 75, showTurnerInfoCanvas: document.getElementById('set-show-turner-info-canvas') ? document.getElementById('set-show-turner-info-canvas').value === 'yes' : false, turnerInfoCanvasW: parseInt(document.getElementById('set-turner-info-canvas-w')?.value) || 200, bonusMode: document.getElementById('set-bonus-mode').value, valueSelectMode: document.getElementById('set-value-select-mode') ? document.getElementById('set-value-select-mode').value : 'dropdown', groupPreset: document.getElementById('set-group-preset') ? document.getElementById('set-group-preset').value : '0.0' };
 lijst.push({id, naam, datum: new Date().toLocaleString(), formType: type, visSettings: frozenVisSettings});
-localStorage.setItem('ts_lijst', JSON.stringify(lijst));
+setLijst(lijst);
 await saveToDB(id, []);
 sluitModal(); laadOverzicht(); openWedstrijd(id);
-}
-
-function changeLanguage() {
-    const lang = document.getElementById('set-lang').value;
-    const t = translations[lang];
-    document.getElementById('btn-new-competition').innerText = t.newComp;
-    document.getElementById('settings-title').innerText = t.settingsTitle;
-    document.getElementById('lbl-sidebar-w').innerText = t.sidebarW;
-    document.getElementById('lbl-topbar-h').innerText = t.topbarH;
-    document.getElementById('btn-full-screen').innerText = t.fullscreenBtn;
-    document.getElementById('btn-reset-settings').innerText = t.resetBtn;
-    document.getElementById('my-competitions-title').innerText = t.myComp;
-    if(document.getElementById('lbl-blanco')) document.getElementById('lbl-blanco').innerText = t.extra_blanco;
-    if(document.getElementById('lbl-gym-w')) document.getElementById('lbl-gym-w').innerText = t.width_gym;
-    if(document.getElementById('lbl-gym-h')) document.getElementById('lbl-gym-h').innerText = t.height_gym;
-    if(document.getElementById('lbl-turner-info-canvas')) document.getElementById('lbl-turner-info-canvas').innerText = t.turner_info_canvas || 'Canvas naam/land tonen:';
-    if(document.getElementById('lbl-turner-info-canvas-w')) document.getElementById('lbl-turner-info-canvas-w').innerText = t.turner_info_canvas_w || 'Breedte Naam/Land (px):';
-    if(document.getElementById('lbl-value-select-mode')) document.getElementById('lbl-value-select-mode').innerText = t.value_select_mode || 'Waardes selecteren:';
-    if(document.getElementById('lbl-group-preset')) document.getElementById('lbl-group-preset').innerText = t.group_preset || 'Preset groepen:';
-    const sidebarH3 = document.querySelector('.sidebar h3');
-    if(sidebarH3) sidebarH3.innerText = t.dscore_header;
-    const appLabel = document.querySelector('.apparatus-container label');
-    if(appLabel) appLabel.innerText = t.apparatus_label;
-    const appSelect = document.getElementById('apparatus-select');
-    Array.from(appSelect.options).forEach(opt => {
-        if(t[opt.value]) opt.text = t[opt.value];
-    });
-    const sortSelect = document.getElementById('sort-order');
-    if(sortSelect) {
-        sortSelect.options[0].text = t.sort_date_new;
-        sortSelect.options[1].text = t.sort_date_old;
-        sortSelect.options[2].text = t.sort_name;
-    }
-    document.querySelectorAll('[data-i18n]').forEach(el => {
-        const key = el.getAttribute('data-i18n');
-        if(t[key]) el.innerText = t[key];
-    });
-    localStorage.setItem('ts_lang', lang);
 }
 
 function fixComma(input) { input.value = input.value.replace(',', '.'); }
@@ -1160,28 +1521,62 @@ laadVisibilitySettings(); updateLayoutSettings(); changeLanguage();
 }
 
 function laadOverzicht() {
-const lijstData = JSON.parse(localStorage.getItem('ts_lijst') || '[]');
-const container = document.getElementById('wedstrijd-lijst');
-const order = document.getElementById('sort-order').value;
-let lijst = [...lijstData];
-if (order === 'new') { lijst.reverse(); }
-else if (order === 'name') { lijst.sort((a, b) => a.naam.localeCompare(b.naam)); }
-container.innerHTML = '';
-lijst.forEach(w => {
-container.innerHTML += `<div class="wedstrijd-item">
-<div class="wedstrijd-info" onclick="openWedstrijd('${w.id}')"><strong>${w.naam}</strong><small>${w.datum} | <b>${w.formType || 'FIG'}</b></small></div>
-<div class="export-actions"><button class="btn-action btn-edit" onclick="wijzigNaam('${w.id}')">EDIT</button>
-<button class="btn-action btn-pdf" onclick="exportWedstrijdPDF('${w.id}', '${w.naam}')">PDF</button>
-<button class="btn-action btn-excel" onclick="exportWedstrijdExcel('${w.id}', '${w.naam}')">EXCEL</button>
-<button class="btn-action btn-del" onclick="verwijderWedstrijd('${w.id}')">WIS</button></div></div>`;
-});
+    const container = document.getElementById('wedstrijd-lijst');
+    const order = document.getElementById('sort-order').value;
+    const lijst = [...getLijst()];
+    if (order === 'new') { lijst.reverse(); }
+    else if (order === 'name') { lijst.sort((a, b) => String(a.naam).localeCompare(String(b.naam))); }
+    container.replaceChildren();
+    if (lijst.length === 0) {
+        const p = document.createElement('p');
+        p.className = 'empty-list';
+        p.textContent = t('no_competitions');
+        container.appendChild(p);
+        return;
+    }
+    // Opgebouwd met DOM-elementen (niet met HTML-tekst), zodat namen met ' of " de knoppen niet breken.
+    const makeButton = (cls, key, handler) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn-action ' + cls;
+        btn.textContent = t(key);
+        btn.addEventListener('click', handler);
+        return btn;
+    };
+    lijst.forEach(w => {
+        const item = document.createElement('div');
+        item.className = 'wedstrijd-item';
+        const info = document.createElement('div');
+        info.className = 'wedstrijd-info';
+        info.addEventListener('click', () => openWedstrijd(w.id));
+        const title = document.createElement('strong');
+        title.textContent = w.naam;
+        const meta = document.createElement('small');
+        meta.append(`${w.datum || ''} | `);
+        const type = document.createElement('b');
+        type.textContent = w.formType || 'FIG';
+        meta.appendChild(type);
+        info.append(title, meta);
+        const actions = document.createElement('div');
+        actions.className = 'export-actions';
+        actions.append(
+            makeButton('btn-results', 'btn_results', () => openUitslag(w.id)),
+            makeButton('btn-edit', 'btn_edit', () => wijzigNaam(w.id)),
+            makeButton('btn-pdf', 'btn_pdf', () => exportWedstrijdPDF(w.id, w.naam)),
+            makeButton('btn-excel', 'btn_excel', () => exportWedstrijdExcel(w.id, w.naam)),
+            makeButton('btn-del', 'btn_delete', () => verwijderWedstrijd(w.id))
+        );
+        item.append(info, actions);
+        container.appendChild(item);
+    });
 }
 
 function wijzigNaam(id) {
-let lijst = JSON.parse(localStorage.getItem('ts_lijst') || '[]');
-const index = lijst.findIndex(w => w.id === id);
-const nieuweNaam = prompt("Nieuwe naam:", lijst[index].naam);
-if (nieuweNaam) { lijst[index].naam = nieuweNaam; localStorage.setItem('ts_lijst', JSON.stringify(lijst)); laadOverzicht(); }
+    const lijst = getLijst();
+    const index = lijst.findIndex(w => w.id === id);
+    if (index === -1) return;
+    const nieuweNaam = prompt(t('prompt_new_name'), lijst[index].naam);
+    if (nieuweNaam && nieuweNaam.trim()) { lijst[index].naam = nieuweNaam.trim(); setLijst(lijst); laadOverzicht(); }
 }
 
 
@@ -1239,7 +1634,7 @@ function applyGroupPresetDefaults() {
     refreshChoiceWidgets();
 }
 function isElementCountSelect(select) { return !!(select && select.id && select.id.startsWith('val') && !select.id.startsWith('bonusVal')); }
-function getChoiceLabel(select, value) { if (select && select.id === 'stickBonus') return value === '0.1' ? 'Ja' : 'Nee'; return value; }
+function getChoiceLabel(select, value) { if (select && select.id === 'stickBonus') return value === '0.1' ? t('opt_yes') : t('opt_no'); return value; }
 function ensureChoiceWidget(select) {
     if (!select || !select.id || select.id.startsWith('typeBlanco')) return;
     select.classList.add('value-select-source');
@@ -1345,7 +1740,7 @@ function buildDSidebarForLevel() {
     };
 
     if(bonusMode === 'auto' && type.includes('NTS')) {
-        listContainer.innerHTML += `<div class="element-header-row"><label>Bonus</label></div>`;
+        listContainer.innerHTML += `<div class="element-header-row"><label>${t('bonus_header')}</label></div>`;
     }
 
     const counterMsg = document.getElementById('counter-msg');
@@ -1419,9 +1814,16 @@ function applyTurnerInfoCanvasVisibility(visSettings) {
     canvas.style.width = (visSettings.turnerInfoCanvasW || visSettings.canvasW || 200) + "px";
     canvas.style.height = (visSettings.canvasH || 75) + "px";
 }
-async function openWedstrijd(id) {
+// true zolang een wedstrijd geopend wordt: dan niets opslaan (het scherm toont nog de vorige wedstrijd)
+let wedstrijdLaden = false;
+async function openWedstrijd(id, startIndex) {
+if (saveTimeout) { clearTimeout(saveTimeout); saveTimeout = null; }
+wedstrijdLaden = true;
+let data;
+try { data = await loadFromDB(id); }
+catch (err) { wedstrijdLaden = false; alert(err && err.message ? err.message : err); return; }
 huidigeWedstrijdId = id;
-database = await loadFromDB(id);
+database = data;
 currentIndex = 0;
 const wData = getCurrentWedstrijdData();
 toggleMixLevelSelector();
@@ -1441,8 +1843,10 @@ setTimeout(() => {
     setupHighDPICanvas(document.getElementById('writeCanvas'));
     setupHighDPICanvas(document.getElementById('nameCanvas'));
     if(document.getElementById('turnerInfoCanvas')) setupHighDPICanvas(document.getElementById('turnerInfoCanvas'));
+    wedstrijdLaden = false;
     if(database.length > 0) {
-        currentIndex = database.length - 1;
+        const validStart = Number.isInteger(startIndex) && startIndex >= 0 && startIndex < database.length;
+        currentIndex = validStart ? startIndex : database.length - 1;
         loadState(currentIndex);
     } else {
         clearFields();
@@ -1461,16 +1865,27 @@ function setupHighDPICanvas(canvas) {
     ctx.lineCap = 'round'; ctx.lineJoin = 'round';
 }
 
-function toonDashboard() { stopExerciseTimer(false); saveCurrent(); document.getElementById('dashboard').style.display = 'block'; document.getElementById('app-interface').style.display = 'none'; document.body.style.overflow = 'auto'; laadOverzicht(); }
+function toonDashboard() {
+    stopExerciseTimer(false);
+    if (saveTimeout) { clearTimeout(saveTimeout); saveTimeout = null; }
+    saveCurrent();
+    flushPendingWrites();
+    // Geen wedstrijd meer "open": voorkomt dat late opslagacties een (verwijderde) wedstrijd terugzetten.
+    huidigeWedstrijdId = null;
+    closeKeyboard();
+    document.getElementById('dashboard').style.display = 'block';
+    document.getElementById('app-interface').style.display = 'none';
+    document.body.style.overflow = 'auto';
+    laadOverzicht();
+    updateAppInfo();
+}
 
-async function verwijderWedstrijd(id) { 
-    if(confirm("Zeker weten?")) { 
-        let lijst = JSON.parse(localStorage.getItem('ts_lijst') || '[]'); 
-        lijst = lijst.filter(w => w.id !== id); 
-        localStorage.setItem('ts_lijst', JSON.stringify(lijst)); 
-        await deleteFromDB(id);
-        laadOverzicht(); 
-    } 
+async function verwijderWedstrijd(id) {
+    const wedstrijd = getLijst().find(w => w.id === id);
+    if (!confirm(t('confirm_delete_comp', { naam: wedstrijd ? wedstrijd.naam : '' }))) return;
+    setLijst(getLijst().filter(w => w.id !== id));
+    await deleteFromDB(id);
+    laadOverzicht();
 }
 
 /* --- CANVAS LOGICA --- */
@@ -1509,6 +1924,11 @@ let strokes = {
 
 let currentStroke = null;
 let stylusButtonDown = false;
+
+// Houdt bij welk canvas sinds het laden/opslaan is veranderd. Alleen dan wordt er een
+// (trage) PNG-afbeelding gemaakt; bij gewoon cijfers intikken niet meer.
+const canvasDirty = { writeCanvas: false, nameCanvas: false, turnerInfoCanvas: false };
+function markCanvasesClean() { Object.keys(canvasDirty).forEach(k => { canvasDirty[k] = false; }); }
 
 function setMode(newMode) { mode = newMode; document.getElementById('penBtn').classList.toggle('active', mode === 'pen'); document.getElementById('eraserBtn').classList.toggle('active', mode === 'eraser'); }
 function togglePalmRejection() { onlyPenMode = !onlyPenMode; document.getElementById('palmBtn').classList.toggle('palm-locked', onlyPenMode); }
@@ -1556,9 +1976,11 @@ function redrawCanvasFromStrokes(canvas) {
     if (!canvas || !strokes[canvas.id]) return;
     invalidateCanvasLoad(canvas.id);
     clearCanvasHard(canvas);
-    const ctx = canvas.getContext('2d');
+    drawStrokeList(canvas.getContext('2d'), strokes[canvas.id]);
+}
 
-    strokes[canvas.id].forEach(stroke => {
+function drawStrokeList(ctx, strokeList) {
+    strokeList.forEach(stroke => {
         if (!stroke.points || stroke.points.length === 0) return;
 
         const isEraseStroke = stroke.type === 'erase';
@@ -1626,6 +2048,7 @@ function safeParseStrokes(data) {
     }, { passive: false });
 
     const stopDrawing = () => {
+        canvasDirty[el.id] = true;
         drawing = false;
         activeCanvas = null;
         currentStroke = null;
@@ -1644,6 +2067,7 @@ function safeParseStrokes(data) {
 
         drawing = true;
         activeCanvas = el;
+        canvasDirty[el.id] = true;
         el.setPointerCapture(e.pointerId);
         p1 = pos;
         p2 = pos;
@@ -1819,17 +2243,17 @@ function buildEInputs() {
         let html = `
             <div style="display:flex; gap:10px; align-items:center;">
                 <div class="vt-input-col">
-                    <label class="vt-label">MIJN E-AFTREK</label>
+                    <label class="vt-label">${t('mb_my_e')}</label>
                     <input type="text" id="mb-e-eigen" value="0.0" class="input-standard" 
                            readonly onclick="openFloatingKeyboard(this)" oninput="rekenen()">
                 </div>
                 <div class="vt-input-col">
-                    <label class="vt-label">MIJN EIND</label>
+                    <label class="vt-label">${t('mb_my_final')}</label>
                     <input type="text" id="mb-mijn-eind-display" value="0.000" class="input-standard" 
                            style="background:#f0f0f0; font-weight:bold; width: 60px;" readonly>
                 </div>
                 <div class="vt-input-col">
-                    <label class="vt-label">EXTRA JURY</label>
+                    <label class="vt-label">${t('mb_extra_jury')}</label>
                     <select id="mb-extra-jury-count" class="input-standard" 
                             onchange="mbExtraJuryCount = parseInt(this.value); buildEInputs(); rekenen();">
                         <option value="0" ${mbExtraJuryCount == 0 ? 'selected' : ''}>0</option>
@@ -1841,7 +2265,7 @@ function buildEInputs() {
         if (mbExtraJuryCount >= 1) {
             html += `
                 <div class="vt-input-col">
-                    <label class="vt-label">EIND J2</label>
+                    <label class="vt-label">${t('mb_final_j2')}</label>
                     <input type="text" id="mb-eind-j2" value="0.0" class="input-standard" style="width: 60px;" 
                            readonly onclick="openFloatingKeyboard(this)" oninput="rekenen()">
                 </div>`;
@@ -1849,7 +2273,7 @@ function buildEInputs() {
         if (mbExtraJuryCount == 2) {
             html += `
                 <div class="vt-input-col">
-                    <label class="vt-label">EIND J3</label>
+                    <label class="vt-label">${t('mb_final_j3')}</label>
                     <input type="text" id="mb-eind-j3" value="0.0" class="input-standard" style="width: 60px;" 
                            readonly onclick="openFloatingKeyboard(this)" oninput="rekenen()">
                 </div>`;
@@ -2049,6 +2473,7 @@ function updateElementDropdownLimits(type) {
 function rekenen() {
     const apparatus = document.getElementById('apparatus-select').value;
     const wData = getCurrentWedstrijdData();
+    if (!wData) return;
     const type = getCurrentLevel();
     const isVT = (apparatus === 'VT');
 
@@ -2203,8 +2628,28 @@ let alleElementen = []; let totaalIngevoerd = 0;
     saveCurrent();
     refreshChoiceWidgets(); 
 }
+// Bepaalt wat er voor een canvas als afbeelding wordt bewaard.
+// - De penstreken (strokes) zijn de echte bron; daaruit wordt alles opnieuw getekend.
+// - Het grote schrijfvlak heeft dan geen PNG meer nodig (scheelt veel opslag en tijd).
+// - Naam-canvassen houden een PNG voor de Excel-export, maar die wordt alleen opnieuw
+//   gemaakt als er echt iets getekend/gewist is.
+// - Oude wedstrijden zonder strokes behouden hun bestaande PNG.
+function canvasDataForSave(canvasId, previousValue, keepPngWithStrokes) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return 'data:,';
+    const hasStrokes = (strokes[canvasId] || []).length > 0;
+    if (hasStrokes) {
+        if (!keepPngWithStrokes) return 'data:,';
+        if (!canvasDirty[canvasId] && previousValue && previousValue !== 'data:,') return previousValue;
+        return canvas.toDataURL('image/png');
+    }
+    if (canvasDirty[canvasId]) return 'data:,'; // alles is uitgegumd
+    return previousValue || 'data:,';
+}
+
 function saveCurrent() {
-if(!huidigeWedstrijdId) return;
+if(!huidigeWedstrijdId || wedstrijdLaden) return;
+const prev = database[currentIndex] || {};
 const blancoValues = []; const blancoTypes = [];
 for(let i=0; i<6; i++) {
     const v = document.getElementById('valBlanco'+i); const t = document.getElementById('typeBlanco'+i);
@@ -2228,7 +2673,7 @@ elements: letters.map(l => document.getElementById('val' + l) ? document.getElem
 bonusVals: letters.map(l => document.getElementById('bonusVal' + l) ? document.getElementById('bonusVal' + l).value : "0"),
 blancoVals: blancoValues, blancoTyps: blancoTypes,
 groups: [document.getElementById('grI').value, ...Array.from(document.querySelectorAll('.cr')).map(c => c.value), document.getElementById('grIV').value],
-canvasData: document.getElementById('writeCanvas').toDataURL('image/png'), nameCanvasData: document.getElementById('nameCanvas').toDataURL('image/png'), turnerInfoCanvasData: document.getElementById('turnerInfoCanvas') ? document.getElementById('turnerInfoCanvas').toDataURL('image/png') : "data:,",
+canvasData: canvasDataForSave('writeCanvas', prev.canvasData, false), nameCanvasData: canvasDataForSave('nameCanvas', prev.nameCanvasData, true), turnerInfoCanvasData: canvasDataForSave('turnerInfoCanvas', prev.turnerInfoCanvasData, true),
 strokesData: JSON.stringify(strokes.writeCanvas), nameStrokesData: JSON.stringify(strokes.nameCanvas), turnerInfoStrokesData: JSON.stringify(strokes.turnerInfoCanvas || []),
 vt_d1: document.getElementById('vt-d1').value,
 vt_d2: document.getElementById('vt-d2').value,
@@ -2242,13 +2687,17 @@ mb_stick: document.getElementById('mb-stick').value,
 mb_e_eigen: document.getElementById('mb-e-eigen') ? document.getElementById('mb-e-eigen').value : "0.0",
 mb_extra_jury_count: mbExtraJuryCount,
 mb_eind_j2: document.getElementById('mb-eind-j2') ? document.getElementById('mb-eind-j2').value : "0.0",
-mb_eind_j3: document.getElementById('mb-eind-j3') ? document.getElementById('mb-eind-j3').value : "0.0"
+mb_eind_j3: document.getElementById('mb-eind-j3') ? document.getElementById('mb-eind-j3').value : "0.0",
+// Optionele getypte naam (in te vullen in het uitslagenoverzicht)
+gymnastName: prev.gymnastName || ''
 };
-saveToDB(huidigeWedstrijdId, database);
+markCanvasesClean();
+scheduleDBWrite(huidigeWedstrijdId, database);
 }
 
 function loadState(index) {  
 const s = database[index]; if(!s) return;
+markCanvasesClean();
 loadExerciseTimer(s.timerElapsedMs || 0);
 // Laad nieuwe lijn-object opslag; oude wedstrijden blijven via PNG zichtbaar.
 strokes.writeCanvas = safeParseStrokes(s.strokesData);
@@ -2401,6 +2850,7 @@ function goPrevious() {
 }
 
 function clearFields() {
+    markCanvasesClean();
     loadExerciseTimer(0);
     invalidateCanvasLoad('writeCanvas');
     invalidateCanvasLoad('nameCanvas');
@@ -2445,31 +2895,125 @@ function clearFields() {
 
 function updateUI() { document.getElementById('page-info').innerText = `${currentIndex + 1}/${Math.max(database.length, currentIndex + 1)}`; document.getElementById('btnPrev').disabled = currentIndex === 0; }
 
-async function exportWedstrijdExcel(id, naam) {
-const data = await loadFromDB(id); if(data.length === 0) return;
-const lijst = JSON.parse(localStorage.getItem('ts_lijst') || '[]');
-const wData = lijst.find(w => w.id === id); const formType = wData ? wData.formType : 'FIG';
-const isMB = (formType === 'Middenbouw');
-const workbook = new ExcelJS.Workbook(); const worksheet = workbook.addWorksheet('Resultaten');
-worksheet.columns = [{ header: 'Gymnast', key: 'img', width: 15 }, { header: 'Naam/Land', key: 'turnerInfoImg', width: 15 }, { header: 'Toestel', key: 'apparatus', width: 10 }, { header: 'Niveau', key: 'level', width: 12 }, { header: 'D-Score', key: 'dscore', width: 10 }, { header: 'Σ Elementen', key: 'sumElem', width: 12 }, { header: 'Σ Groepen', key: 'sumGroup', width: 12 }, { header: 'CV', key: 'cv', width: 6 }, { header: 'Stick', key: 'stick', width: 7 }, { header: 'B-Score', key: 'bscore', width: 8 }, { header: 'N-Score', key: 'nscore', width: 8 }, { header: 'I', key: 'g1', width: 5 }, { header: 'II', key: 'g2', width: 5 }, { header: 'III', key: 'g3', width: 5 }, { header: 'IV', key: 'g4', width: 5 }, { header: 'TA', key: 'eTA', width: 4 }, { header: 'TB', key: 'eTB', width: 4 }, { header: 'A', key: 'eA', width: 4 }, { header: 'B', key: 'eB', width: 4 }, { header: 'C', key: 'eC', width: 4 }, { header: 'D', key: 'eD', width: 4 }, { header: 'E', key: 'eE', width: 4 }, { header: 'F', key: 'eF', width: 4 }, { header: 'G', key: 'eG', width: 4 }, { header: 'H', key: 'eH', width: 4 }, { header: 'I', key: 'eI', width: 4 }, { header: 'J', key: 'eJ', width: 4 }, { header: 'E1', key: 'E1', width: 5 }, { header: 'E2', key: 'E2', width: 5 }, { header: 'E3', key: 'E3', width: 5 }, { header: 'E4', key: 'E4', width: 5 }, { header: 'E5', key: 'E5', width: 5 }, { header: 'E6', key: 'E6', width: 5 }, { header: 'E7', key: 'E7', width: 5 }, { header: 'E-Aftrek', key: 'eavg', width: 10 }, { header: 'Eindcijfer', key: 'final', width: 12 }];
-worksheet.getRow(1).font = { bold: true };
-for (let i = 0; i < data.length; i++) {
-const gym = data[i]; const rowNum = i + 2; const row = worksheet.getRow(rowNum);
-const effectiveType = (formType === 'Mix') ? (gym.mixLevel || 'FIG') : formType;
-const isMBRow = (effectiveType === 'Middenbouw');
-let counts = { 'J': parseInt(gym.elements[0]) || 0, 'I': parseInt(gym.elements[1]) || 0, 'H': parseInt(gym.elements[2]) || 0, 'G': parseInt(gym.elements[3]) || 0, 'F': parseInt(gym.elements[4]) || 0, 'E': parseInt(gym.elements[5]) || 0, 'D': parseInt(gym.elements[6]) || 0, 'C': parseInt(gym.elements[7]) || 0, 'B': parseInt(gym.elements[8]) || 0, 'A': parseInt(gym.elements[9]) || 0, 'TB': parseInt(gym.elements[10]) || 0, 'TA': parseInt(gym.elements[11]) || 0 };
-if (gym.blancoVals && gym.blancoTyps) { for (let b = 0; b < 6; b++) { const type = gym.blancoTyps[b]; const val = parseInt(gym.blancoVals[b]) || 0; if (type && counts.hasOwnProperty(type)) { counts[type] += val; } } }
-let finalD = gym.dScore;
-if(isMBRow && gym.mb_traj) {
-    finalD = document.getElementById('mb-totaal') ? gym.dScore : gym.dScore; 
+/* --- GEDEELDE HULPFUNCTIES VOOR UITSLAG EN EXCEL --- */
+function getEntryLevel(entry, formType) {
+    return formType === 'Mix' ? (entry.mixLevel || 'FIG') : (formType || 'FIG');
+}
+function toNumber(value) {
+    const n = parseFloat(String(value ?? '').replace(',', '.'));
+    return Number.isFinite(n) ? n : 0;
+}
+// Zelfde regel als calculateAverageE: bij 4 of meer juryleden vallen hoogste en laagste weg.
+function averageE(values) {
+    const nums = (values || []).map(toNumber);
+    if (nums.length === 0) return 0;
+    if (nums.length >= 4) {
+        const sorted = [...nums].sort((a, b) => a - b);
+        return sorted.slice(1, -1).reduce((a, b) => a + b, 0) / (nums.length - 2);
+    }
+    return nums.reduce((a, b) => a + b, 0) / nums.length;
+}
+function getEntryDText(entry, level) {
+    if (level === 'Middenbouw') return (entry.mb_traj || []).reduce((sum, v) => sum + toNumber(v), 0).toFixed(3);
+    if (entry.apparatus === 'VT') return `${entry.vt_d1 || '0.0'} | ${entry.vt_d2 || '0.0'}`;
+    return entry.dScore;
+}
+function getEntryEText(entry, level) {
+    if (level !== 'Middenbouw' && entry.apparatus === 'VT') return `${averageE(entry.eValues).toFixed(3)} | ${averageE(entry.eValues2).toFixed(3)}`;
+    return entry.avgE;
+}
+// Het eindcijfer is tekst; bij sprong staan er twee cijfers in (gescheiden door een regel of <br>).
+function getFinalParts(eindScore) {
+    return String(eindScore || '').split(/<br\s*\/?>|\n/i).map(part => part.replace(/<[^>]*>/g, '').trim()).filter(Boolean);
+}
+// Leeg = niets geschreven en niets ingevuld (bijv. de lege pagina na de laatste turner).
+function isEmptyEntry(entry) {
+    if (!entry) return true;
+    const nonZero = v => toNumber(v) !== 0;
+    if (String(entry.gymnastName || '').trim()) return false;
+    if (['strokesData', 'nameStrokesData', 'turnerInfoStrokesData'].some(k => safeParseStrokes(entry[k]).length > 0)) return false;
+    if (entry.nameStrokesData === undefined && entry.nameCanvasData && entry.nameCanvasData !== 'data:,') return false; // oude opslag
+    if ((entry.eValues || []).some(nonZero) || (entry.eValues2 || []).some(nonZero)) return false;
+    if ((entry.elements || []).some(nonZero) || (entry.blancoVals || []).some(nonZero) || (entry.mb_traj || []).some(nonZero)) return false;
+    return ![entry.vt_d1, entry.vt_d2, entry.neutraal, entry.b_score, entry.cv, entry.mb_e_eigen, entry.mb_eind_j2, entry.mb_eind_j3].some(nonZero);
+}
+function strokesToDataURL(strokeList, width, height) {
+    const scale = 2;
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(width * scale));
+    canvas.height = Math.max(1, Math.round(height * scale));
+    const ctx = canvas.getContext('2d');
+    ctx.scale(scale, scale);
+    drawStrokeList(ctx, strokeList);
+    return canvas.toDataURL('image/png');
+}
+// Geeft de afbeelding van een handgeschreven veld terug ({ src, maybeBlank }), of null.
+// maybeBlank = alleen een PNG uit een oudere versie zonder penstreken: die kan leeg zijn,
+// dat wordt met isBlankImage() gecontroleerd.
+function getEntryDrawing(entry, pngField, strokesField, width, height) {
+    const list = safeParseStrokes(entry[strokesField]);
+    const png = entry[pngField];
+    if (list.length > 0) return { src: (png && png !== 'data:,') ? png : strokesToDataURL(list, width, height), maybeBlank: false };
+    if (png && png !== 'data:,') return { src: png, maybeBlank: true };
+    return null;
+}
+const blankImageCache = new Map();
+function isBlankImage(src) {
+    if (!src || src === 'data:,') return Promise.resolve(true);
+    if (blankImageCache.has(src)) return Promise.resolve(blankImageCache.get(src));
+    return new Promise(resolve => {
+        const img = new Image();
+        img.onload = () => {
+            let blank = true;
+            try {
+                const c = document.createElement('canvas');
+                c.width = img.naturalWidth || 1; c.height = img.naturalHeight || 1;
+                const ctx = c.getContext('2d');
+                ctx.drawImage(img, 0, 0);
+                const px = ctx.getImageData(0, 0, c.width, c.height).data;
+                for (let i = 3; i < px.length; i += 4) { if (px[i] !== 0) { blank = false; break; } }
+            } catch (e) { blank = false; }
+            blankImageCache.set(src, blank);
+            resolve(blank);
+        };
+        img.onerror = () => resolve(true);
+        img.src = src;
+    });
+}
+async function getEntryDrawingForExport(entry, pngField, strokesField, width, height) {
+    const drawing = getEntryDrawing(entry, pngField, strokesField, width, height);
+    if (!drawing) return null;
+    if (drawing.maybeBlank && await isBlankImage(drawing.src)) return null;
+    return drawing.src;
 }
 
-row.values = {apparatus: gym.apparatus, level: effectiveType, dscore: finalD, sumElem: gym.subElem, sumGroup: gym.subGroups, g1: gym.groups[0], g2: gym.groups[1], g3: gym.groups[2], g4: gym.groups[3], cv: gym.cv, stick: (isMBRow) ? (gym.mb_stick || gym.stick) : gym.stick, bscore: (effectiveType.includes('NTS') || isMBRow) ? gym.b_score : '', nscore: gym.neutraal, eTA: counts['TA'], eTB: counts['TB'], eA: counts['A'], eB: counts['B'], eC: counts['C'], eD: counts['D'], eE: counts['E'], eF: counts['F'], eG: counts['G'], eH: counts['H'], eI: counts['I'], eJ: counts['J'], E1: gym.eValues[0] || '', E2: gym.eValues[1] || '', E3: gym.eValues[2] || '', E4: gym.eValues[3] || '', E5: gym.eValues[4] || '', E6: gym.eValues[5] || '', E7: gym.eValues[6] || '', eavg: gym.avgE, final: gym.eindScore.replace('<br>', ' | ').replace(/<[^>]*>/g, '') };
-if (gym.nameCanvasData && gym.nameCanvasData !== "data:,") { const imageId = workbook.addImage({ base64: gym.nameCanvasData, extension: 'png' }); worksheet.addImage(imageId, { tl: { col: 0.1, row: rowNum - 0.9 }, ext: { width: 100, height: 60 } }); }
-if (gym.turnerInfoCanvasData && gym.turnerInfoCanvasData !== "data:,") { const infoImageId = workbook.addImage({ base64: gym.turnerInfoCanvasData, extension: 'png' }); worksheet.addImage(infoImageId, { tl: { col: 1.1, row: rowNum - 0.9 }, ext: { width: 100, height: 60 } }); }
+async function exportWedstrijdExcel(id, naam) {
+const data = await loadFromDB(id);
+const rows = data.filter(entry => entry && !isEmptyEntry(entry));
+if (rows.length === 0) { alert(t('alert_no_data')); return; }
+const wData = getLijst().find(w => w.id === id);
+const formType = wData ? wData.formType : 'FIG';
+const vis = (wData && wData.visSettings) || {};
+const workbook = new ExcelJS.Workbook(); const worksheet = workbook.addWorksheet(t('xl_sheet'));
+worksheet.columns = [{ header: t('xl_gymnast'), key: 'img', width: 15 }, { header: t('xl_turner_info'), key: 'turnerInfoImg', width: 15 }, { header: t('xl_name'), key: 'nameText', width: 20 }, { header: t('xl_apparatus'), key: 'apparatus', width: 10 }, { header: t('xl_level'), key: 'level', width: 12 }, { header: 'D-Score', key: 'dscore', width: 12 }, { header: t('xl_sum_elem'), key: 'sumElem', width: 12 }, { header: t('xl_sum_groups'), key: 'sumGroup', width: 12 }, { header: 'CV', key: 'cv', width: 6 }, { header: 'Stick', key: 'stick', width: 7 }, { header: 'B-Score', key: 'bscore', width: 8 }, { header: 'N-Score', key: 'nscore', width: 8 }, { header: 'I', key: 'g1', width: 5 }, { header: 'II', key: 'g2', width: 5 }, { header: 'III', key: 'g3', width: 5 }, { header: 'IV', key: 'g4', width: 5 }, { header: 'TA', key: 'eTA', width: 4 }, { header: 'TB', key: 'eTB', width: 4 }, { header: 'A', key: 'eA', width: 4 }, { header: 'B', key: 'eB', width: 4 }, { header: 'C', key: 'eC', width: 4 }, { header: 'D', key: 'eD', width: 4 }, { header: 'E', key: 'eE', width: 4 }, { header: 'F', key: 'eF', width: 4 }, { header: 'G', key: 'eG', width: 4 }, { header: 'H', key: 'eH', width: 4 }, { header: 'I', key: 'eI', width: 4 }, { header: 'J', key: 'eJ', width: 4 }, { header: 'E1', key: 'E1', width: 5 }, { header: 'E2', key: 'E2', width: 5 }, { header: 'E3', key: 'E3', width: 5 }, { header: 'E4', key: 'E4', width: 5 }, { header: 'E5', key: 'E5', width: 5 }, { header: 'E6', key: 'E6', width: 5 }, { header: 'E7', key: 'E7', width: 5 }, { header: t('xl_e_ded'), key: 'eavg', width: 14 }, { header: t('xl_final'), key: 'final', width: 16 }];
+worksheet.getRow(1).font = { bold: true };
+for (const [i, gym] of rows.entries()) {
+const rowNum = i + 2; const row = worksheet.getRow(rowNum);
+const effectiveType = getEntryLevel(gym, formType);
+const isMBRow = (effectiveType === 'Middenbouw');
+const el = gym.elements || [];
+let counts = { 'J': parseInt(el[0]) || 0, 'I': parseInt(el[1]) || 0, 'H': parseInt(el[2]) || 0, 'G': parseInt(el[3]) || 0, 'F': parseInt(el[4]) || 0, 'E': parseInt(el[5]) || 0, 'D': parseInt(el[6]) || 0, 'C': parseInt(el[7]) || 0, 'B': parseInt(el[8]) || 0, 'A': parseInt(el[9]) || 0, 'TB': parseInt(el[10]) || 0, 'TA': parseInt(el[11]) || 0 };
+if (gym.blancoVals && gym.blancoTyps) { for (let b = 0; b < 6; b++) { const type = gym.blancoTyps[b]; const val = parseInt(gym.blancoVals[b]) || 0; if (type && counts.hasOwnProperty(type)) { counts[type] += val; } } }
+const groups = gym.groups || [];
+const eVals = gym.eValues || [];
+row.values = {nameText: gym.gymnastName || '', apparatus: gym.apparatus, level: effectiveType, dscore: getEntryDText(gym, effectiveType), sumElem: gym.subElem, sumGroup: gym.subGroups, g1: groups[0], g2: groups[1], g3: groups[2], g4: groups[3], cv: gym.cv, stick: (isMBRow) ? (gym.mb_stick || gym.stick) : gym.stick, bscore: (effectiveType.includes('NTS') || isMBRow) ? gym.b_score : '', nscore: gym.neutraal, eTA: counts['TA'], eTB: counts['TB'], eA: counts['A'], eB: counts['B'], eC: counts['C'], eD: counts['D'], eE: counts['E'], eF: counts['F'], eG: counts['G'], eH: counts['H'], eI: counts['I'], eJ: counts['J'], E1: eVals[0] || '', E2: eVals[1] || '', E3: eVals[2] || '', E4: eVals[3] || '', E5: eVals[4] || '', E6: eVals[5] || '', E7: eVals[6] || '', eavg: getEntryEText(gym, effectiveType), final: getFinalParts(gym.eindScore).join(' | ') };
+const nameImg = await getEntryDrawingForExport(gym, 'nameCanvasData', 'nameStrokesData', vis.canvasW || 200, vis.canvasH || 75);
+if (nameImg) { const imageId = workbook.addImage({ base64: nameImg, extension: 'png' }); worksheet.addImage(imageId, { tl: { col: 0.1, row: rowNum - 0.9 }, ext: { width: 100, height: 60 } }); }
+const infoImg = await getEntryDrawingForExport(gym, 'turnerInfoCanvasData', 'turnerInfoStrokesData', vis.turnerInfoCanvasW || vis.canvasW || 200, vis.canvasH || 75);
+if (infoImg) { const infoImageId = workbook.addImage({ base64: infoImg, extension: 'png' }); worksheet.addImage(infoImageId, { tl: { col: 1.1, row: rowNum - 0.9 }, ext: { width: 100, height: 60 } }); }
 row.height = 50; row.alignment = { vertical: 'middle', horizontal: 'center' };
 }
-const buffer = await workbook.xlsx.writeBuffer(); saveAs(new Blob([buffer]), `${naam}_Export.xlsx`);
+const buffer = await workbook.xlsx.writeBuffer(); saveAs(new Blob([buffer]), `${safeFileName(naam)}_${t('file_export')}.xlsx`);
 }
 
 function updateApparatusImage() {
@@ -2622,11 +3166,11 @@ function requestAppFullScreen(showError = false) {
     const result = request.call(root);
     if (result && result.catch) {
       result.catch(err => {
-        if (showError) alert(`Fout bij activeren volledig scherm: ${err.message}`);
+        if (showError) alert(t('fullscreen_error') + err.message);
       });
     }
   } catch (err) {
-    if (showError) alert(`Fout bij activeren volledig scherm: ${err.message}`);
+    if (showError) alert(t('fullscreen_error') + err.message);
   }
 }
 function forceFullScreen() {
@@ -2682,7 +3226,7 @@ window.addEventListener('orientationchange', () => scheduleFullScreenRestore(500
 ['pointerdown', 'touchstart', 'keydown'].forEach(eventName => {
   document.addEventListener(eventName, () => scheduleFullScreenRestore(50), { passive: true });
 });
-window.onload = () => { laadLayoutSettings(); laadOverzicht(); scheduleFullScreenRestore(500); };
+window.onload = () => { laadLayoutSettings(); laadOverzicht(); updateAppInfo(); requestPersistentStorage(); setupServiceWorker(); scheduleFullScreenRestore(500); };
 document.addEventListener('click', function() {
     scheduleFullScreenRestore(50);
 }, { once: true }); 
@@ -2854,6 +3398,326 @@ function nextField() {
         nextEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
     } else {
         closeKeyboard();
+    }
+}
+
+/* --- APP-VERSIE, OFFLINE EN UPDATES --- */
+function setupServiceWorker() {
+    if (!('serviceWorker' in navigator) || !/^https?:$/.test(location.protocol)) return;
+    navigator.serviceWorker.addEventListener('message', event => {
+        if (event.data && event.data.type === 'UPDATE_AVAILABLE') document.getElementById('update-banner').hidden = false;
+    });
+    if (navigator.serviceWorker.startMessages) navigator.serviceWorker.startMessages();
+    navigator.serviceWorker.register('sw.js?v=' + encodeURIComponent(APP_VERSION))
+        .catch(err => console.warn('Service worker niet geregistreerd:', err));
+    let lastCheck = 0;
+    const checkForAppUpdate = () => {
+        const controller = navigator.serviceWorker.controller;
+        if (!controller || !navigator.onLine) return;
+        if (Date.now() - lastCheck < 60 * 1000) return;
+        lastCheck = Date.now();
+        controller.postMessage({ type: 'CHECK_UPDATE' });
+    };
+    navigator.serviceWorker.ready.then(() => setTimeout(checkForAppUpdate, 2000));
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) checkForAppUpdate(); });
+    window.addEventListener('online', checkForAppUpdate);
+}
+async function installUpdate() {
+    await saveAndFlushNow();
+    location.reload();
+}
+
+/* --- BACKUP MAKEN EN TERUGZETTEN --- */
+function localStamp() {
+    const d = new Date();
+    const p = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}_${p(d.getHours())}-${p(d.getMinutes())}`;
+}
+// Het grote schrijfvlak-PNG is overbodig als de penstreken er zijn: weglaten maakt de backup veel kleiner.
+function slimEntryForBackup(entry) {
+    if (entry && safeParseStrokes(entry.strokesData).length > 0 && entry.canvasData && entry.canvasData !== 'data:,') {
+        return { ...entry, canvasData: 'data:,' };
+    }
+    return entry;
+}
+async function exportBackup() {
+    try {
+        await saveAndFlushNow();
+        const lijst = getLijst();
+        if (lijst.length === 0) { alert(t('backup_empty')); return; }
+        const competitions = [];
+        for (const meta of lijst) {
+            const data = await loadFromDB(meta.id);
+            competitions.push({ meta, data: (Array.isArray(data) ? data : []).map(slimEntryForBackup) });
+        }
+        const settings = {};
+        ['ts_visibility', 'ts_layout', 'ts_lang'].forEach(key => {
+            const value = localStorage.getItem(key);
+            if (value !== null) settings[key] = value;
+        });
+        const backup = { type: 'turnscore-backup', format: 1, appVersion: APP_VERSION, exportedAt: new Date().toISOString(), settings, competitions };
+        saveAs(new Blob([JSON.stringify(backup)], { type: 'application/json' }), `TurnScore-backup_${localStamp()}.json`);
+        localStorage.setItem('ts_last_backup', new Date().toISOString());
+        updateAppInfo();
+    } catch (err) {
+        alert(t('backup_failed') + (err && err.message ? err.message : err));
+    }
+}
+async function importBackup(input) {
+    const file = input.files && input.files[0];
+    input.value = ''; // zodat hetzelfde bestand later opnieuw gekozen kan worden
+    if (!file) return;
+    let backup;
+    try { backup = JSON.parse(await file.text()); } catch (e) { alert(t('backup_invalid')); return; }
+    const competitions = (backup && backup.type === 'turnscore-backup' && Array.isArray(backup.competitions))
+        ? backup.competitions.filter(c => c && c.meta && typeof c.meta.id === 'string' && c.meta.id && Array.isArray(c.data))
+        : [];
+    if (competitions.length === 0) { alert(t('backup_invalid')); return; }
+    try {
+        await saveAndFlushNow();
+        const lijst = getLijst();
+        const existingIds = new Set(lijst.map(w => w.id));
+        const conflicts = competitions.filter(c => existingIds.has(c.meta.id)).length;
+        const overwrite = conflicts > 0 ? confirm(t('backup_conflict', { n: conflicts })) : false;
+        let restored = 0, skipped = 0;
+        try {
+            for (const c of competitions) {
+                const exists = existingIds.has(c.meta.id);
+                if (exists && !overwrite) { skipped++; continue; }
+                await saveToDB(c.meta.id, c.data);
+                const meta = { ...c.meta, naam: String(c.meta.naam ?? c.meta.id), formType: c.meta.formType || 'FIG' };
+                if (exists) lijst[lijst.findIndex(w => w.id === meta.id)] = meta;
+                else { lijst.push(meta); existingIds.add(meta.id); }
+                restored++;
+            }
+        } finally {
+            setLijst(lijst);
+        }
+        // Instellingen alleen overnemen als dit apparaat er nog geen heeft (bijv. een nieuwe tablet).
+        if (backup.settings && typeof backup.settings === 'object') {
+            let changed = false;
+            ['ts_visibility', 'ts_layout', 'ts_lang'].forEach(key => {
+                if (localStorage.getItem(key) === null && typeof backup.settings[key] === 'string') {
+                    localStorage.setItem(key, backup.settings[key]);
+                    changed = true;
+                }
+            });
+            if (changed) laadLayoutSettings();
+        }
+        laadOverzicht();
+        alert(t('backup_restored', { n: restored, s: skipped }));
+    } catch (err) {
+        laadOverzicht();
+        alert(t('backup_restore_failed') + (err && err.message ? err.message : err));
+    }
+}
+
+/* --- TURNER (PAGINA) VERWIJDEREN --- */
+function verwijderHuidigeTurner() {
+    if (!huidigeWedstrijdId) return;
+    const total = Math.max(database.length, currentIndex + 1);
+    if (!confirm(t('confirm_delete_turner', { n: currentIndex + 1, total }))) return;
+    if (saveTimeout) { clearTimeout(saveTimeout); saveTimeout = null; }
+    stopExerciseTimer(false);
+    closeKeyboard();
+    database.splice(currentIndex, 1);
+    if (database.length === 0) {
+        currentIndex = 0;
+        clearFields();
+    } else {
+        currentIndex = Math.min(currentIndex, database.length - 1);
+        loadState(currentIndex);
+    }
+    scheduleDBWrite(huidigeWedstrijdId, database);
+    flushPendingWrites();
+    updateUI();
+}
+
+/* --- UITSLAGENOVERZICHT --- */
+const APPARATUS_ORDER = ['FX', 'PH', 'SR', 'VT', 'PB', 'HB'];
+let uitslagState = null;
+
+function buildUitslagRows() {
+    const { data, meta } = uitslagState;
+    return data.map((entry, index) => {
+        if (!entry) return null;
+        const level = getEntryLevel(entry, meta.formType);
+        const finals = getFinalParts(entry.eindScore);
+        const first = parseFloat(finals[0]);
+        return {
+            index, level,
+            apparatus: entry.apparatus || 'FX',
+            empty: isEmptyEntry(entry),
+            score: Number.isFinite(first) ? first : null,
+            finalText: finals.length ? finals.join(' | ') : '–',
+            dText: getEntryDText(entry, level),
+            eText: getEntryEText(entry, level),
+            isVault: entry.apparatus === 'VT' && level !== 'Middenbouw'
+        };
+    }).filter(Boolean);
+}
+function fillFilterSelect(id, items, selected) {
+    const select = document.getElementById(id);
+    select.replaceChildren(new Option(t('filter_all'), 'all'));
+    items.forEach(item => select.add(new Option(item.label, item.value)));
+    select.value = items.some(item => item.value === selected) ? selected : 'all';
+}
+async function openUitslag(id) {
+    if (!id) return;
+    const inApp = (id === huidigeWedstrijdId);
+    let data;
+    if (inApp) { saveCurrent(); data = database; }
+    else data = await loadFromDB(id);
+    const meta = getLijst().find(w => w.id === id) || { id, naam: '', formType: 'FIG' };
+    uitslagState = { id, data, meta };
+    closeKeyboard();
+    const filled = buildUitslagRows().filter(r => !r.empty);
+    const apps = APPARATUS_ORDER.filter(a => filled.some(r => r.apparatus === a));
+    const currentApp = inApp ? document.getElementById('apparatus-select').value : 'all';
+    fillFilterSelect('results-filter-app', apps.map(a => ({ value: a, label: `${a} · ${t('app_' + a)}` })), currentApp);
+    const levels = [...new Set(filled.map(r => r.level))];
+    fillFilterSelect('results-filter-level', levels.map(l => ({ value: l, label: l })), 'all');
+    document.getElementById('results-level-wrap').style.display = levels.length > 1 ? 'flex' : 'none';
+    renderUitslag();
+    document.getElementById('results-overlay').style.display = 'flex';
+}
+function renderUitslag() {
+    if (!uitslagState) return;
+    const { meta } = uitslagState;
+    document.getElementById('results-title').textContent = `${t('results_heading')} – ${meta.naam || ''}`;
+    const appFilter = document.getElementById('results-filter-app').value || 'all';
+    const levelFilter = document.getElementById('results-filter-level').value || 'all';
+    const sort = document.getElementById('results-sort').value;
+    const all = buildUitslagRows();
+    const emptyCount = all.filter(r => r.empty).length;
+    const rows = all.filter(r => !r.empty && (appFilter === 'all' || r.apparatus === appFilter) && (levelFilter === 'all' || r.level === levelFilter));
+
+    // Plaats per toestel + niveau; gelijke cijfers krijgen dezelfde plaats.
+    const groupKey = r => r.apparatus + '|' + r.level;
+    const groups = new Map();
+    rows.forEach(r => { if (!groups.has(groupKey(r))) groups.set(groupKey(r), []); groups.get(groupKey(r)).push(r); });
+    groups.forEach(list => list.forEach(r => {
+        r.rank = r.score === null ? null : 1 + list.filter(o => o.score !== null && o.score > r.score + 1e-9).length;
+    }));
+
+    const scoreOf = r => (r.score === null ? -Infinity : r.score);
+    const appIndex = r => { const i = APPARATUS_ORDER.indexOf(r.apparatus); return i === -1 ? 99 : i; };
+    const nameOf = r => String(uitslagState.data[r.index].gymnastName || '').trim().toLowerCase();
+    if (sort === 'score') rows.sort((a, b) => (appIndex(a) - appIndex(b)) || a.level.localeCompare(b.level) || (scoreOf(b) - scoreOf(a)) || (a.index - b.index));
+    else if (sort === 'name') rows.sort((a, b) => (!nameOf(a) - !nameOf(b)) || nameOf(a).localeCompare(nameOf(b)) || (a.index - b.index));
+    else rows.sort((a, b) => a.index - b.index);
+
+    const showLevel = new Set(all.filter(r => !r.empty).map(r => r.level)).size > 1;
+    const columns = [['col_rank', 'res-rank'], ['col_name', ''], ['col_apparatus', ''], ...(showLevel ? [['col_level', '']] : []), ['col_d', 'num'], ['col_e', 'num'], ['col_final', 'num'], ['col_page', '']];
+    const head = document.getElementById('results-head');
+    head.replaceChildren(...columns.map(([key, cls]) => {
+        const th = document.createElement('th');
+        th.textContent = t(key);
+        if (cls) th.className = cls;
+        return th;
+    }));
+
+    const body = document.getElementById('results-tbody');
+    body.replaceChildren();
+    const vis = meta.visSettings || {};
+    if (rows.length === 0) {
+        const tr = document.createElement('tr');
+        const td = document.createElement('td');
+        td.colSpan = columns.length; td.className = 'results-empty'; td.textContent = t('results_none');
+        tr.appendChild(td); body.appendChild(tr);
+    }
+    let lastGroup = null;
+    rows.forEach(r => {
+        const entry = uitslagState.data[r.index];
+        if (sort === 'score' && groups.size > 1 && groupKey(r) !== lastGroup) {
+            lastGroup = groupKey(r);
+            const gtr = document.createElement('tr');
+            gtr.className = 'res-group-row';
+            const gtd = document.createElement('td');
+            gtd.colSpan = columns.length;
+            gtd.textContent = `${r.apparatus} · ${t('app_' + r.apparatus)}` + (showLevel ? ` · ${r.level}` : '');
+            gtr.appendChild(gtd); body.appendChild(gtr);
+        }
+        const tr = document.createElement('tr');
+        const cell = (text, cls) => {
+            const td = document.createElement('td');
+            if (cls) td.className = cls;
+            if (text !== undefined) td.textContent = text;
+            tr.appendChild(td);
+            return td;
+        };
+        cell(r.rank === null ? '–' : String(r.rank), 'res-rank');
+
+        const wrap = document.createElement('div');
+        wrap.className = 'res-name-cell';
+        [['nameCanvasData', 'nameStrokesData', vis.canvasW || 200], ['turnerInfoCanvasData', 'turnerInfoStrokesData', vis.turnerInfoCanvasW || vis.canvasW || 200]].forEach(([png, strokesKey, width]) => {
+            const drawing = getEntryDrawing(entry, png, strokesKey, width, vis.canvasH || 75);
+            if (!drawing) return;
+            const img = document.createElement('img');
+            img.alt = '';
+            img.src = drawing.src;
+            if (drawing.maybeBlank) {
+                img.hidden = true; // pas tonen als er echt iets op staat
+                isBlankImage(drawing.src).then(blank => { img.hidden = blank; });
+            }
+            wrap.appendChild(img);
+        });
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'res-name-input';
+        input.placeholder = t('name_placeholder');
+        input.autocomplete = 'off';
+        input.value = entry.gymnastName || '';
+        input.addEventListener('input', () => {
+            const target = uitslagState && uitslagState.data[r.index];
+            if (!target) return;
+            target.gymnastName = input.value;
+            scheduleDBWrite(uitslagState.id, uitslagState.data);
+        });
+        input.addEventListener('change', () => { if (document.getElementById('results-sort').value === 'name') renderUitslag(); });
+        wrap.appendChild(input);
+        cell(undefined, '').appendChild(wrap);
+
+        cell(r.apparatus, '');
+        if (showLevel) cell(r.level, '');
+        cell(r.dText, 'num');
+        cell(r.eText, 'num');
+        cell(r.finalText, 'num res-final' + (r.score === null ? ' res-error' : ''));
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'res-open-btn';
+        btn.textContent = `${r.index + 1} ›`;
+        btn.title = t('open_page_title', { n: r.index + 1 });
+        btn.setAttribute('aria-label', btn.title);
+        btn.addEventListener('click', () => openTurnerVanUitslag(r.index));
+        cell(undefined, '').appendChild(btn);
+        body.appendChild(tr);
+    });
+
+    const notes = [];
+    if (groups.size > 1) notes.push(t('results_rank_note'));
+    if (rows.some(r => r.isVault)) notes.push(t('results_vault_note'));
+    if (emptyCount > 0) notes.push(t('results_hidden_empty', { n: emptyCount }));
+    document.getElementById('results-note').textContent = notes.join(' ');
+}
+function sluitUitslag() {
+    document.getElementById('results-overlay').style.display = 'none';
+    uitslagState = null;
+    flushPendingWrites();
+}
+async function openTurnerVanUitslag(index) {
+    const state = uitslagState;
+    sluitUitslag();
+    if (!state) return;
+    if (state.id === huidigeWedstrijdId) {
+        if (saveTimeout) { clearTimeout(saveTimeout); saveTimeout = null; }
+        saveCurrent();
+        currentIndex = index;
+        loadState(index);
+        updateUI();
+    } else {
+        await flushPendingWrites();
+        openWedstrijd(state.id, index);
     }
 }
 </script>
