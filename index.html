@@ -941,7 +941,7 @@ if ('virtualKeyboard' in navigator) {
 
 // Versienummer van de app. Verhoog dit bij elke nieuwe versie die je uploadt:
 // dan halen alle apparaten bij de volgende start alle bestanden opnieuw op.
-const APP_VERSION = '2.1.0';
+const APP_VERSION = '2.1.1';
 
 let huidigeWedstrijdId = null;
 let database = [];
@@ -2051,6 +2051,8 @@ function safeParseStrokes(data) {
         canvasDirty[el.id] = true;
         drawing = false;
         activeCanvas = null;
+        // Eindtijd van de streek (voor latere analyse van pauzes tussen steno-symbolen).
+        if (currentStroke) currentStroke.t1 = Date.now();
         currentStroke = null;
         stylusButtonDown = false;
 
@@ -2081,6 +2083,7 @@ function safeParseStrokes(data) {
             currentStroke = {
                 type: 'erase',
                 size: eraserSize,
+                t0: Date.now(),
                 points: [pos]
             };
             strokes[el.id].push(currentStroke);
@@ -2103,6 +2106,8 @@ function safeParseStrokes(data) {
             type: 'draw',
             color: currentColor,
             size: strokeSize,
+            // Starttijd (ms sinds 1970); samen met t1 laat dit zien waar je pauzeert tussen elementen.
+            t0: Date.now(),
             points: [pos]
         };
         strokes[el.id].push(currentStroke);
