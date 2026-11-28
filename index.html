@@ -941,7 +941,7 @@ if ('virtualKeyboard' in navigator) {
 
 // Versienummer van de app. Verhoog dit bij elke nieuwe versie die je uploadt:
 // dan halen alle apparaten bij de volgende start alle bestanden opnieuw op.
-const APP_VERSION = '2.1.1';
+const APP_VERSION = '2.1.2';
 
 let huidigeWedstrijdId = null;
 let database = [];
@@ -2733,13 +2733,19 @@ if(s.apparatus === 'VT' && s.eValues2) {
 document.getElementById('stickBonus').value = s.stick; document.getElementById('neutraal').value = s.neutraal;
 document.getElementById('b_score').value = s.b_score || "0.0"; document.getElementById('cv').value = s.cv;
 
-letters.forEach((l, i) => { 
-    if(document.getElementById('val' + l)) document.getElementById('val' + l).value = s.elements[i]; 
-    if(s.bonusVals && document.getElementById('bonusVal' + l)) document.getElementById('bonusVal' + l).value = s.bonusVals[i];
+letters.forEach((l, i) => {
+    if(document.getElementById('val' + l)) document.getElementById('val' + l).value = s.elements[i];
 });
 
 if(s.blancoVals) {
     for(let i=0; i<6; i++) { const v = document.getElementById('valBlanco'+i); const t = document.getElementById('typeBlanco'+i); if(v) v.value = s.blancoVals[i]; if(t) t.value = s.blancoTyps[i]; }
+}
+
+// Bonus pas invullen NA de elementaantallen: een bonus-keuzelijst loopt maar tot het aantal elementen
+// van die waarde. Eerder werd de bonus ingevuld terwijl de lijst nog alleen "0" had, waardoor hij op 0 sprong.
+updateBonusDropdownLimits();
+if(s.bonusVals) {
+    letters.forEach((l, i) => { const b = document.getElementById('bonusVal' + l); if(b) b.value = s.bonusVals[i]; });
 }
 const gFields = [document.getElementById('grI'), ...Array.from(document.querySelectorAll('.cr')), document.getElementById('grIV')];
 gFields.forEach((f, i) => f.value = s.groups[i]);
